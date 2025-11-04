@@ -1,0 +1,670 @@
+import 'dart:convert';
+import 'package:collection/collection.dart';
+import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  runApp(const GurumeApp());
+}
+
+class GurumeApp extends StatelessWidget {
+  const GurumeApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final base = ThemeData(
+      useMaterial3: true,
+      colorSchemeSeed: const Color(0xFFE23D28), // kırmızımsı turuncu (sıcak/premium)
+    );
+
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      title: 'Gurume',
+      theme: base.copyWith(
+        textTheme: GoogleFonts.playfairDisplayTextTheme(base.textTheme),
+        appBarTheme: AppBarTheme(
+          titleTextStyle: GoogleFonts.playfairDisplay(
+            fontSize: 20, fontWeight: FontWeight.w700,
+            color: base.colorScheme.onSurface,
+          ),
+        ),
+      ),
+      home: const _Bootstrapper(child: HomeShell()),
+    );
+  }
+}
+
+/// Uygulama durumu (favoriler, kişisel rota) – kalıcı olarak saklanır.
+class AppState extends ChangeNotifier {
+  AppState(this.prefs);
+
+  final SharedPreferences prefs;
+
+  static const _kFavorites = 'favorites';
+  static const _kMyRoute = 'my_route';
+
+  final Set<String> _favoritePlaceIds = {};
+  final List<String> _myRoutePlaceIds = [];
+
+  Set<String> get favorites => _favoritePlaceIds;
+  List<String> get myRoute => List.unmodifiable(_myRoutePlaceIds);
+
+  Future<void> load() async {
+    _favoritePlaceIds
+      ..clear()
+      ..addAll((prefs.getStringList(_kFavorites) ?? <String>[]));
+    _myRoutePlaceIds
+      ..clear()
+      ..addAll((prefs.getStringList(_kMyRoute) ?? <String>[]));
+    notifyListeners();
+  }
+
+  Future<void> _save() async {
+    await prefs.setStringList(_kFavorites, _favoritePlaceIds.toList());
+    await prefs.setStringList(_kMyRoute, _myRoutePlaceIds);
+  }
+
+  void toggleFavorite(String placeId) {
+    if (_favoritePlaceIds.contains(placeId)) {
+      _favoritePlaceIds.remove(placeId);
+    } else {
+      _favoritePlaceIds.add(placeId);
+    }
+    _save();
+    notifyListeners();
+  }
+
+  void toggleInMyRoute(String placeId) {
+    if (_myRoutePlaceIds.contains(placeId)) {
+      _myRoutePlaceIds.remove(placeId);
+    } else {
+      _myRoutePlaceIds.add(placeId);
+    }
+    _save();
+    notifyListeners();
+  }
+
+  void addAllToMyRoute(Iterable<String> ids) {
+    for (final id in ids) {
+      if (!_myRoutePlaceIds.contains(id)) {
+        _myRoutePlaceIds.add(id);
+      }
+    }
+    _save();
+    notifyListeners();
+  }
+
+  void clearMyRoute() {
+    _myRoutePlaceIds.clear();
+    _save();
+    notifyListeners();
+  }
+
+  void reorderMyRoute(int oldIndex, int newIndex) {
+    if (newIndex > oldIndex) newIndex -= 1;
+    final item = _myRoutePlaceIds.removeAt(oldIndex);
+    _myRoutePlaceIds.insert(newIndex, item);
+    _save();
+    notifyListeners();
+  }
+}
+
+/// Uygulama açılışında SharedPreferences + AppState yükleyici
+class _Bootstrapper extends StatefulWidget {
+  const _Bootstrapper({required this.child});
+  final Widget child;
+
+  @override
+  State<_Bootstrapper> createState() => _BootstrapperState();
+}
+
+class _BootstrapperState extends State<_Bootstrapper> {
+  AppState? state;
+
+  @override
+  void initState() {
+    super.initState();
+    _init();
+  }
+
+  Future<void> _init() async {
+    final prefs = await SharedPreferences.getInstance();
+    final st = AppState(prefs);
+    await st.load();
+    setState(() => state = st);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (state == null) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+    return _StateProvider(state: state!, child: widget.child);
+  }
+}
+
+class _StateProvider extends InheritedNotifier<AppState> {
+  const _StateProvider({required AppState state, required Widget child, super.key})
+      : super(notifier: state, child: child);
+
+  static AppState of(BuildContext context) {
+    final p = context.dependOnInheritedWidgetOfExactType<_StateProvider>();
+    assert(p != null, 'StateProvider not found');
+    return p!.notifier!;
+  }
+
+  @override
+  bool updateShouldNotify(_StateProvider oldWidget) => true;
+}
+
+/// Veri modelleri
+class Place {
+  final String id;
+  final String name;
+  final String city;
+  final String category;
+  final double rating;
+  final String price; // ₺, ₺₺, ₺₺₺
+  final String summary;
+
+  const Place({
+    required this.id,
+    required this.name,
+    required this.city,
+    required this.category,
+    required this.rating,
+    required this.price,
+    required this.summary,
+  });
+}
+
+class Guide {
+  final String id;
+  final String title;
+  final String city;
+  final String author; // rehberi oluşturan kişi/kurum adı
+  final List<String> placeIds;
+
+  const Guide({
+    required this.id,
+    required this.title,
+    required this.city,
+    required this.author,
+    required this.placeIds,
+  });
+
+  int get count => placeIds.length;
+}
+
+/// Sahte veri (MVP). Sonraki aşamada Supabase/Firebase’e taşırız.
+final List<Place> kPlaces = [
+  const Place(
+    id: 'p1',
+    name: 'Akhisar Köfteci Usta',
+    city: 'Manisa/Akhisar',
+    category: 'Köfte',
+    rating: 4.7,
+    price: '₺₺',
+    summary: 'Odun ateşinde klasik Akhisar köftesi. Piyaz ve ayran önerilir.',
+  ),
+  const Place(
+    id: 'p2',
+    name: 'Sahil Balık',
+    city: 'İzmir/Karşıyaka',
+    category: 'Balık',
+    rating: 4.6,
+    price: '₺₺₺',
+    summary: 'Mevsim balığı, sade sunum. Kalamar ve roka-limon ikilisi şahane.',
+  ),
+  const Place(
+    id: 'p3',
+    name: 'Vapur Simit & Çay',
+    city: 'İstanbul/Beşiktaş',
+    category: 'Atıştırmalık',
+    rating: 4.4,
+    price: '₺',
+    summary: 'Boğaz manzarasında simit-çay klasiği. Uygun fiyatlı durak.',
+  ),
+  const Place(
+    id: 'p4',
+    name: 'Kahve Atölyesi',
+    city: 'Ankara/Çankaya',
+    category: 'Kahve',
+    rating: 4.8,
+    price: '₺₺',
+    summary: '3. dalga kahve; filtre ve V60 çok iyi. Sessiz çalışma köşeleri.',
+  ),
+  const Place(
+    id: 'p5',
+    name: 'Bursa İskenderci',
+    city: 'Bursa/Osmangazi',
+    category: 'Döner',
+    rating: 4.5,
+    price: '₺₺₺',
+    summary: 'Tereyağlı iskender. Yoğurdu bol isteyenler için ideal.',
+  ),
+  const Place(
+    id: 'p6',
+    name: 'Urfa Sofrası',
+    city: 'Şanlıurfa/Merkez',
+    category: 'Kebap',
+    rating: 4.7,
+    price: '₺₺',
+    summary: 'Urfa kebabı, isotlu salata, açık ayran. Akşam üzeri kalabalık.',
+  ),
+];
+
+final List<Guide> kGuides = [
+  Guide(
+    id: 'g1',
+    title: 'Akhisar’da 10 Numara Köfte Rotası',
+    city: 'Manisa/Akhisar',
+    author: 'Gurume Editör',
+    placeIds: ['p1', 'p3', 'p4'],
+  ),
+  Guide(
+    id: 'g2',
+    title: 'İzmir’de Deniz Üstü Lezzetler',
+    city: 'İzmir',
+    author: 'Gurume Topluluk',
+    placeIds: ['p2', 'p3'],
+  ),
+  Guide(
+    id: 'g3',
+    title: 'Kebap Sevenler İçin Güneydoğu Kısa Tur',
+    city: 'Şanlıurfa',
+    author: 'Gurume Editör',
+    placeIds: ['p6', 'p5'],
+  ),
+];
+
+Place? getPlaceById(String id) => kPlaces.firstWhereOrNull((p) => p.id == id);
+
+/// Ana kabuk: 3 sekme — Keşfet, Rotalar, Rotam
+class HomeShell extends StatefulWidget {
+  const HomeShell({super.key});
+
+  @override
+  State<HomeShell> createState() => _HomeShellState();
+}
+
+class _HomeShellState extends State<HomeShell> {
+  int _index = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    final tabs = [
+      const ExploreTab(),
+      const GuidesTab(),
+      const MyRouteTab(),
+    ];
+
+    return Scaffold(
+      appBar: AppBar(
+        leading: Padding(
+          padding: const EdgeInsets.all(8),
+          child: Image.asset(
+            'assets/logo.png',
+            errorBuilder: (_, __, ___) => const Icon(Icons.ramen_dining),
+          ),
+        ),
+        title: const Text('Gurume'),
+        actions: const [SizedBox(width: 8)],
+      ),
+      body: tabs[_index],
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _index,
+        onDestinationSelected: (i) => setState(() => _index = i),
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.explore_outlined),
+            selectedIcon: Icon(Icons.explore),
+            label: 'Keşfet',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.menu_book_outlined),
+            selectedIcon: Icon(Icons.menu_book),
+            label: 'Rotalar',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.map_outlined),
+            selectedIcon: Icon(Icons.map),
+            label: 'Rotam',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 1) KEŞFET — arama + kategori filtresi + yer kartları
+class ExploreTab extends StatefulWidget {
+  const ExploreTab({super.key});
+
+  @override
+  State<ExploreTab> createState() => _ExploreTabState();
+}
+
+class _ExploreTabState extends State<ExploreTab> {
+  String query = '';
+  String category = 'Tümü';
+
+  @override
+  Widget build(BuildContext context) {
+    final cats = ['Tümü', ...{for (final p in kPlaces) p.category}];
+    final list = kPlaces
+        .where((p) =>
+            (category == 'Tümü' || p.category == category) &&
+            (query.trim().isEmpty ||
+                p.name.toLowerCase().contains(query.toLowerCase()) ||
+                p.city.toLowerCase().contains(query.toLowerCase())))
+        .toList()
+      ..sort((a, b) => b.rating.compareTo(a.rating));
+
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 12, 12, 6),
+          child: TextField(
+            decoration: const InputDecoration(
+              hintText: 'Mekân, şehir veya kategori ara…',
+              prefixIcon: Icon(Icons.search),
+              border: OutlineInputBorder(),
+            ),
+            onChanged: (v) => setState(() => query = v),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+          child: DropdownButtonFormField<String>(
+            value: category,
+            items: cats
+                .map((c) => DropdownMenuItem<String>(
+                      value: c,
+                      child: Text(c),
+                    ))
+                .toList(),
+            onChanged: (v) => setState(() => category = v ?? 'Tümü'),
+            decoration: const InputDecoration(
+              labelText: 'Kategori',
+              border: OutlineInputBorder(),
+            ),
+          ),
+        ),
+        Expanded(
+          child: ListView.builder(
+            itemCount: list.length,
+            itemBuilder: (_, i) => PlaceCard(place: list[i]),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// 2) ROTLAR — Rehber listesi + detay ekranı
+class GuidesTab extends StatelessWidget {
+  const GuidesTab({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.separated(
+      padding: const EdgeInsets.all(12),
+      itemCount: kGuides.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      itemBuilder: (_, i) {
+        final g = kGuides[i];
+        return Card(
+          child: ListTile(
+            leading: const Icon(Icons.menu_book),
+            title: Text(g.title),
+            subtitle: Text('${g.city} • ${g.count} durak • ${g.author}'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => GuideDetailScreen(guide: g)),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class GuideDetailScreen extends StatelessWidget {
+  const GuideDetailScreen({super.key, required this.guide});
+  final Guide guide;
+
+  @override
+  Widget build(BuildContext context) {
+    final places = guide.placeIds.map((id) => getPlaceById(id)).whereType<Place>().toList();
+
+    return Scaffold(
+      appBar: AppBar(title: Text(guide.title)),
+      body: ListView(
+        padding: const EdgeInsets.all(12),
+        children: [
+          Text('${guide.city} • ${guide.count} durak • ${guide.author}',
+              style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 12),
+          for (final p in places) PlaceCard(place: p),
+          const SizedBox(height: 24),
+          FilledButton.icon(
+            icon: const Icon(Icons.add_road),
+            label: const Text('Bu rotayı “Rotam”a ekle'),
+            onPressed: () {
+              final app = _StateProvider.of(context);
+              app.addAllToMyRoute(guide.placeIds);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Rota “Rotam”a eklendi.')),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 3) ROTAM — Kişisel rota (sürükle-bırak sıralama, temizle)
+class MyRouteTab extends StatelessWidget {
+  const MyRouteTab({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final app = _StateProvider.of(context);
+    final selected = app.myRoute.map(getPlaceById).whereType<Place>().toList();
+
+    if (selected.isEmpty) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(24.0),
+          child: Text(
+            'Henüz bir yer eklemedin.\nKeşfet’ten veya Rotalar’dan “Rotama ekle” butonunu kullan.',
+            textAlign: TextAlign.center,
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 12, 12, 6),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Toplam ${selected.length} durak',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              ),
+              TextButton.icon(
+                onPressed: app.clearMyRoute,
+                icon: const Icon(Icons.delete_sweep_outlined),
+                label: const Text('Temizle'),
+              )
+            ],
+          ),
+        ),
+        Expanded(
+          child: ReorderableListView.builder(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+            itemCount: selected.length,
+            onReorder: app.reorderMyRoute,
+            itemBuilder: (_, i) {
+              final p = selected[i];
+              return Card(
+                key: ValueKey(p.id),
+                child: ListTile(
+                  title: Text(p.name),
+                  subtitle: Text('${p.city} • ${p.category} • ${p.price}'),
+                  trailing: const Icon(Icons.drag_handle),
+                ),
+              );
+            },
+          ),
+        ),
+        SafeArea(
+          minimum: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          child: FilledButton.icon(
+            icon: const Icon(Icons.route),
+            label: const Text('Rotayı oluştur (paylaş/harita yakında)'),
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Harita/Paylaşım bir sonraki sürümde eklenecek.'),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// YER KARTI — favori & rotaya ekle + detay
+class PlaceCard extends StatelessWidget {
+  const PlaceCard({super.key, required this.place});
+  final Place place;
+
+  @override
+  Widget build(BuildContext context) {
+    final app = _StateProvider.of(context);
+    final isFav = app.favorites.contains(place.id);
+    final inRoute = app.myRoute.contains(place.id);
+
+    return Card(
+      child: ListTile(
+        leading: _RatingBadge(rating: place.rating),
+        title: Text(place.name),
+        subtitle: Text('${place.city} • ${place.category} • ${place.price}'),
+        trailing: Wrap(
+          spacing: 6,
+          children: [
+            IconButton(
+              tooltip: isFav ? 'Favorilerden çıkar' : 'Favorilere ekle',
+              onPressed: () => app.toggleFavorite(place.id),
+              icon: Icon(isFav ? Icons.favorite : Icons.favorite_border),
+            ),
+            IconButton(
+              tooltip: inRoute ? 'Rotadan çıkar' : 'Rotama ekle',
+              onPressed: () => app.toggleInMyRoute(place.id),
+              icon: Icon(inRoute ? Icons.check_circle : Icons.add_circle_outline),
+            ),
+          ],
+        ),
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => PlaceDetailScreen(place: place)),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _RatingBadge extends StatelessWidget {
+  const _RatingBadge({required this.rating});
+  final double rating;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return CircleAvatar(
+      backgroundColor: cs.secondaryContainer,
+      foregroundColor: cs.onSecondaryContainer,
+      child: Text(rating.toStringAsFixed(1)),
+    );
+  }
+}
+
+/// YER DETAY — özet, puan, butonlar
+class PlaceDetailScreen extends StatelessWidget {
+  const PlaceDetailScreen({super.key, required this.place});
+  final Place place;
+
+  @override
+  Widget build(BuildContext context) {
+    final app = _StateProvider.of(context);
+    final isFav = app.favorites.contains(place.id);
+    final inRoute = app.myRoute.contains(place.id);
+
+    return Scaffold(
+      appBar: AppBar(title: Text(place.name)),
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(place.city, style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Chip(label: Text(place.category)),
+                const SizedBox(width: 8),
+                Row(
+                  children: [
+                    const Icon(Icons.star, size: 18),
+                    const SizedBox(width: 4),
+                    Text(place.rating.toStringAsFixed(1)),
+                  ],
+                ),
+                const SizedBox(width: 12),
+                Text(place.price),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(place.summary),
+            const Spacer(),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    icon: Icon(isFav ? Icons.favorite : Icons.favorite_border),
+                    label: Text(isFav ? 'Favorilerde' : 'Favoriye Ekle'),
+                    onPressed: () => app.toggleFavorite(place.id),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: FilledButton.icon(
+                    icon: Icon(inRoute ? Icons.check : Icons.add),
+                    label: Text(inRoute ? 'Rotada' : 'Rotama Ekle'),
+                    onPressed: () => app.toggleInMyRoute(place.id),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
