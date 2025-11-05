@@ -4,8 +4,8 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors } from '@/constants/theme';
-import { mockData } from '@/data/mock-data';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useGurumeData } from '@/hooks/use-gurume-data';
 
 const plannerSteps = [
   {
@@ -31,8 +31,9 @@ const plannerSteps = [
 
 export default function CreateRouteScreen() {
   const colorScheme = useColorScheme() ?? 'light';
+  const { data } = useGurumeData();
 
-  const quickPicks = mockData.places.slice(0, 4);
+  const quickPicks = data.places.slice(0, 4);
 
   return (
     <ScrollView contentContainerStyle={styles.container}>

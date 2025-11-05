@@ -6,16 +6,18 @@ import { FlatList, Pressable, ScrollView, StyleSheet, View } from 'react-native'
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors } from '@/constants/theme';
-import { mockData, featuredRouteIds, highlightedCityIds } from '@/data/mock-data';
+import { featuredRouteIds, highlightedCityIds } from '@/data/mock-data';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import type { Route } from '@/types';
+import { useGurumeData } from '@/hooks/use-gurume-data';
+import type { City, Route } from '@/types';
 
 export default function HomeScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme() ?? 'light';
+  const { data, getCityById } = useGurumeData();
 
-  const featuredRoutes = mockData.routes.filter((route) => featuredRouteIds.includes(route.id));
-  const highlightedCities = mockData.cities.filter((city) => highlightedCityIds.includes(city.id));
+  const featuredRoutes = data.routes.filter((route) => featuredRouteIds.includes(route.id));
+  const highlightedCities = data.cities.filter((city) => highlightedCityIds.includes(city.id));
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -55,7 +57,13 @@ export default function HomeScreen() {
         subtitle="Topluluğun favori lezzet kaçamakları"
         data={featuredRoutes}
         renderItem={(route) => (
-          <RouteCard key={route.id} route={route} colorScheme={colorScheme} />
+          <RouteCard
+            key={route.id}
+            route={route}
+            colorScheme={colorScheme}
+            onPress={() => router.push(`/route/${route.id}`)}
+            resolveCity={getCityById}
+          />
         )}
       />
 
@@ -72,15 +80,28 @@ export default function HomeScreen() {
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.cityList}
         ItemSeparatorComponent={() => <View style={styles.citySeparator} />}
-        renderItem={({ item }) => <CityCard cityId={item.id} colorScheme={colorScheme} />}
+        renderItem={({ item }) => (
+          <CityCard
+            cityId={item.id}
+            colorScheme={colorScheme}
+            resolveCity={getCityById}
+            onPress={() => router.push(`/city/${item.id}`)}
+          />
+        )}
       />
 
       <Section
         title="Toplulukta Popüler"
         subtitle="Son haftada en çok puanlanan rotalar"
-        data={mockData.routes.slice(0, 3)}
+        data={data.routes.slice(0, 3)}
         renderItem={(route) => (
-          <RouteCompact key={route.id} route={route} colorScheme={colorScheme} />
+          <RouteCompact
+            key={route.id}
+            route={route}
+            colorScheme={colorScheme}
+            onPress={() => router.push(`/route/${route.id}`)}
+            resolveCity={getCityById}
+          />
         )}
       />
     </ScrollView>
@@ -110,88 +131,124 @@ function Section<T>({ title, subtitle, data, renderItem }: SectionProps<T>) {
   );
 }
 
-function RouteCard({ route, colorScheme }: { route: Route; colorScheme: 'light' | 'dark' }) {
-  const city = mockData.cities.find((c) => c.id === route.cityId);
+function RouteCard({
+  route,
+  colorScheme,
+  onPress,
+  resolveCity,
+}: {
+  route: Route;
+  colorScheme: 'light' | 'dark';
+  onPress: () => void;
+  resolveCity: (id: string) => City | undefined;
+}) {
+  const city = resolveCity(route.cityId);
   const stopCount = route.stops.length;
 
   return (
-    <ThemedView
-      style={[
-        styles.routeCard,
-        {
-          borderColor: Colors[colorScheme].tabIconDefault,
-        },
-      ]}>
-      <Image source={{ uri: route.coverImage }} style={styles.routeImage} />
-      <View style={styles.routeContent}>
-        <View style={styles.routeHeader}>
-          <ThemedText type="subtitle" style={styles.routeTitle}>
-            {route.title}
-          </ThemedText>
-          <ThemedText style={styles.routeRating}>
-            ⭐ {route.averageRating.toFixed(1)} ({route.ratingCount})
-          </ThemedText>
+    <Pressable onPress={onPress} accessibilityRole="button">
+      <ThemedView
+        style={[
+          styles.routeCard,
+          {
+            borderColor: Colors[colorScheme].tabIconDefault,
+          },
+        ]}>
+        <Image source={{ uri: route.coverImage }} style={styles.routeImage} />
+        <View style={styles.routeContent}>
+          <View style={styles.routeHeader}>
+            <ThemedText type="subtitle" style={styles.routeTitle}>
+              {route.title}
+            </ThemedText>
+            <ThemedText style={styles.routeRating}>
+              ⭐ {route.averageRating.toFixed(1)} ({route.ratingCount})
+            </ThemedText>
+          </View>
+          <ThemedText style={styles.routeDescription}>{route.description}</ThemedText>
+          <View style={styles.routeMetaRow}>
+            <MetaPill label={city?.name ?? 'Bilinmiyor'} />
+            <MetaPill label={`${stopCount} durak`} />
+            <MetaPill label={`${Math.round(route.distanceKm)} km`} />
+          </View>
+          <View style={styles.tagRow}>
+            {route.tags.map((tag) => (
+              <Tag key={tag} label={tag} colorScheme={colorScheme} />
+            ))}
+          </View>
         </View>
-        <ThemedText style={styles.routeDescription}>{route.description}</ThemedText>
-        <View style={styles.routeMetaRow}>
-          <MetaPill label={city?.name ?? 'Bilinmiyor'} />
-          <MetaPill label={`${stopCount} durak`} />
-          <MetaPill label={`${Math.round(route.distanceKm)} km`} />
-        </View>
-        <View style={styles.tagRow}>
-          {route.tags.map((tag) => (
-            <Tag key={tag} label={tag} colorScheme={colorScheme} />
-          ))}
-        </View>
-      </View>
-    </ThemedView>
+      </ThemedView>
+    </Pressable>
   );
 }
 
-function RouteCompact({ route, colorScheme }: { route: Route; colorScheme: 'light' | 'dark' }) {
-  const city = mockData.cities.find((c) => c.id === route.cityId);
+function RouteCompact({
+  route,
+  colorScheme,
+  onPress,
+  resolveCity,
+}: {
+  route: Route;
+  colorScheme: 'light' | 'dark';
+  onPress: () => void;
+  resolveCity: (id: string) => City | undefined;
+}) {
+  const city = resolveCity(route.cityId);
 
   return (
-    <ThemedView style={styles.routeCompact}>
-      <Image source={{ uri: route.coverImage }} style={styles.routeCompactImage} />
-      <View style={styles.routeCompactContent}>
-        <ThemedText style={styles.routeCompactTitle}>{route.title}</ThemedText>
-        <ThemedText style={styles.routeCompactMeta}>
-          {city?.name} • {route.stops.length} durak • ⭐ {route.averageRating.toFixed(1)}
-        </ThemedText>
-        <View style={styles.compactTagRow}>
-          {route.tags.slice(0, 2).map((tag) => (
-            <Tag key={tag} label={tag} colorScheme={colorScheme} compact />
-          ))}
+    <Pressable onPress={onPress} accessibilityRole="button">
+      <ThemedView style={styles.routeCompact}>
+        <Image source={{ uri: route.coverImage }} style={styles.routeCompactImage} />
+        <View style={styles.routeCompactContent}>
+          <ThemedText style={styles.routeCompactTitle}>{route.title}</ThemedText>
+          <ThemedText style={styles.routeCompactMeta}>
+            {city?.name} • {route.stops.length} durak • ⭐ {route.averageRating.toFixed(1)}
+          </ThemedText>
+          <View style={styles.compactTagRow}>
+            {route.tags.slice(0, 2).map((tag) => (
+              <Tag key={tag} label={tag} colorScheme={colorScheme} compact />
+            ))}
+          </View>
         </View>
-      </View>
-    </ThemedView>
+      </ThemedView>
+    </Pressable>
   );
 }
 
-function CityCard({ cityId, colorScheme }: { cityId: string; colorScheme: 'light' | 'dark' }) {
-  const city = mockData.cities.find((item) => item.id === cityId);
+function CityCard({
+  cityId,
+  colorScheme,
+  resolveCity,
+  onPress,
+}: {
+  cityId: string;
+  colorScheme: 'light' | 'dark';
+  resolveCity: (id: string) => City | undefined;
+  onPress: () => void;
+}) {
+  const city = resolveCity(cityId);
   if (!city) return null;
 
   return (
-    <ThemedView
-      style={[
-        styles.cityCard,
-        {
-          borderColor: Colors[colorScheme].tabIconDefault,
-        },
-      ]}>
-      <Image source={{ uri: city.heroImage }} style={styles.cityImage} />
-      <View style={styles.cityContent}>
-        <ThemedText type="subtitle">{city.name}</ThemedText>
-        <ThemedText style={styles.cityDescription}>{city.description}</ThemedText>
-        <View style={styles.tagRow}>
-          {city.highlightTags.map((tag) => (
-            <Tag key={tag} label={tag} colorScheme={colorScheme} compact />
-          ))}
+    <Pressable onPress={onPress} accessibilityRole="button">
+      <ThemedView
+        style={[
+          styles.cityCard,
+          {
+            borderColor: Colors[colorScheme].tabIconDefault,
+          },
+        ]}>
+        <Image source={{ uri: city.heroImage }} style={styles.cityImage} />
+        <View style={styles.cityContent}>
+          <ThemedText type="subtitle">{city.name}</ThemedText>
+          <ThemedText style={styles.cityDescription}>{city.description}</ThemedText>
+          <View style={styles.tagRow}>
+            {city.highlightTags.map((tag) => (
+              <Tag key={tag} label={tag} colorScheme={colorScheme} compact />
+            ))}
+          </View>
         </View>
-      </View>
-    </ThemedView>
+      </ThemedView>
+    </Pressable>
   );
 }
 

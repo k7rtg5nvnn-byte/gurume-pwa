@@ -1,22 +1,25 @@
 import React, { useMemo, useState } from 'react';
 import { Image } from 'expo-image';
-import { FlatList, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { useRouter } from 'expo-router';
+import { FlatList, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors } from '@/constants/theme';
-import { mockData } from '@/data/mock-data';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useGurumeData } from '@/hooks/use-gurume-data';
 
 export default function ExploreScreen() {
   const [searchTerm, setSearchTerm] = useState('');
   const colorScheme = useColorScheme() ?? 'light';
+  const router = useRouter();
+  const { data, getCityById, getPlacesByCityId, getRoutesByCityId } = useGurumeData();
 
   const stats = useMemo(() => {
-    return mockData.cities.map((city) => {
-      const places = mockData.places.filter((place) => place.cityId === city.id);
-      const districts = mockData.districts.filter((district) => district.cityId === city.id);
-      const routes = mockData.routes.filter((route) => route.cityId === city.id);
+    return data.cities.map((city) => {
+      const places = getPlacesByCityId(city.id);
+      const districts = data.districts.filter((district) => district.cityId === city.id);
+      const routes = getRoutesByCityId(city.id);
 
       return {
         cityId: city.id,
@@ -25,36 +28,36 @@ export default function ExploreScreen() {
         routeCount: routes.length,
       };
     });
-  }, []);
+  }, [data.cities, data.districts, getPlacesByCityId, getRoutesByCityId]);
 
   const filteredCities = useMemo(() => {
     if (!searchTerm.trim()) {
-      return mockData.cities;
+      return data.cities;
     }
 
     const lowered = searchTerm.toLowerCase();
     const matchingCityIds = new Set<string>();
 
-    mockData.cities.forEach((city) => {
+    data.cities.forEach((city) => {
       if (city.name.toLowerCase().includes(lowered)) {
         matchingCityIds.add(city.id);
       }
     });
 
-    mockData.districts.forEach((district) => {
+    data.districts.forEach((district) => {
       if (district.name.toLowerCase().includes(lowered)) {
         matchingCityIds.add(district.cityId);
       }
     });
 
-    mockData.places.forEach((place) => {
+    data.places.forEach((place) => {
       if (place.name.toLowerCase().includes(lowered)) {
         matchingCityIds.add(place.cityId);
       }
     });
 
-    return mockData.cities.filter((city) => matchingCityIds.has(city.id));
-  }, [searchTerm]);
+    return data.cities.filter((city) => matchingCityIds.has(city.id));
+  }, [data.cities, data.districts, data.places, searchTerm]);
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -76,7 +79,7 @@ export default function ExploreScreen() {
 
       <ThemedView style={styles.summaryRow}>
         {stats.map((item) => {
-          const city = mockData.cities.find((c) => c.id === item.cityId);
+          const city = getCityById(item.cityId);
           if (!city) return null;
 
           return (
@@ -110,6 +113,7 @@ export default function ExploreScreen() {
             cityId={item.id}
             colorScheme={colorScheme}
             showAllDistricts={filteredCities.length === 1}
+            onPressCity={() => router.push(`/city/${item.id}`)}
           />
         )}
       />
@@ -122,16 +126,21 @@ export default function ExploreScreen() {
       </ThemedView>
 
       <View style={styles.routeGrid}>
-        {mockData.routes.map((route) => (
-          <ThemedView key={route.id} style={styles.routeTile}>
-            <Image source={{ uri: route.coverImage }} style={styles.routeTileImage} />
-            <View style={styles.routeTileContent}>
-              <ThemedText style={styles.routeTileTitle}>{route.title}</ThemedText>
-              <ThemedText style={styles.routeTileMeta}>
-                {route.stops.length} durak • ⭐ {route.averageRating.toFixed(1)} ({route.ratingCount})
-              </ThemedText>
-            </View>
-          </ThemedView>
+        {data.routes.map((route) => (
+          <Pressable
+            key={route.id}
+            onPress={() => router.push(`/route/${route.id}`)}
+            accessibilityRole="button">
+            <ThemedView style={styles.routeTile}>
+              <Image source={{ uri: route.coverImage }} style={styles.routeTileImage} />
+              <View style={styles.routeTileContent}>
+                <ThemedText style={styles.routeTileTitle}>{route.title}</ThemedText>
+                <ThemedText style={styles.routeTileMeta}>
+                  {route.stops.length} durak • ⭐ {route.averageRating.toFixed(1)} ({route.ratingCount})
+                </ThemedText>
+              </View>
+            </ThemedView>
+          </Pressable>
         ))}
       </View>
     </ScrollView>
@@ -142,57 +151,63 @@ function CityDetailCard({
   cityId,
   colorScheme,
   showAllDistricts,
+  onPressCity,
 }: {
   cityId: string;
   colorScheme: 'light' | 'dark';
   showAllDistricts: boolean;
+  onPressCity: () => void;
 }) {
-  const city = mockData.cities.find((item) => item.id === cityId);
+  const { getCityById, getPlacesByCityId, data, getRoutesByCityId, getPlacesByDistrictId } = useGurumeData();
+  const city = getCityById(cityId);
   if (!city) return null;
 
-  const districts = mockData.districts.filter((district) => district.cityId === city.id);
-  const places = mockData.places.filter((place) => place.cityId === city.id);
+  const districts = data.districts.filter((district) => district.cityId === city.id);
+  const places = getPlacesByCityId(city.id);
   const samplePlaces = places.slice(0, 3);
+  const routes = getRoutesByCityId(city.id);
 
   return (
-    <ThemedView
-      style={[
-        styles.cityDetailCard,
-        {
-          borderColor: Colors[colorScheme].tabIconDefault,
-        },
-      ]}>
-      <Image source={{ uri: city.heroImage }} style={styles.cityDetailImage} />
-      <View style={styles.cityDetailContent}>
-        <ThemedText type="subtitle" style={styles.cityDetailTitle}>
-          {city.name}
-        </ThemedText>
-        <ThemedText style={styles.cityDetailDescription}>{city.description}</ThemedText>
-        <View style={styles.cityDetailStats}>
-          <InfoBadge label={`${districts.length} ilçe`} />
-          <InfoBadge label={`${places.length} mekan`} />
-          <InfoBadge label={`${mockData.routes.filter((route) => route.cityId === city.id).length} rota`} />
+    <Pressable onPress={onPressCity} accessibilityRole="button">
+      <ThemedView
+        style={[
+          styles.cityDetailCard,
+          {
+            borderColor: Colors[colorScheme].tabIconDefault,
+          },
+        ]}>
+        <Image source={{ uri: city.heroImage }} style={styles.cityDetailImage} />
+        <View style={styles.cityDetailContent}>
+          <ThemedText type="subtitle" style={styles.cityDetailTitle}>
+            {city.name}
+          </ThemedText>
+          <ThemedText style={styles.cityDetailDescription}>{city.description}</ThemedText>
+          <View style={styles.cityDetailStats}>
+            <InfoBadge label={`${districts.length} ilçe`} />
+            <InfoBadge label={`${places.length} mekan`} />
+            <InfoBadge label={`${routes.length} rota`} />
+          </View>
+          <View style={styles.districtList}>
+            {(showAllDistricts ? districts : districts.slice(0, 3)).map((district) => (
+              <View key={district.id} style={styles.districtItem}>
+                <ThemedText style={styles.districtTitle}>{district.name}</ThemedText>
+                <ThemedText style={styles.districtSubtitle}>
+                  {getPlacesByDistrictId(district.id).length} mekan
+                </ThemedText>
+              </View>
+            ))}
+          </View>
+          <View style={styles.samplePlaces}>
+            {samplePlaces.map((place) => (
+              <View key={place.id} style={styles.samplePlaceItem}>
+                <ThemedText style={styles.samplePlaceName}>{place.name}</ThemedText>
+                <ThemedText style={styles.samplePlaceNotes}>{place.specialties.join(', ')}</ThemedText>
+              </View>
+            ))}
+          </View>
         </View>
-        <View style={styles.districtList}>
-          {(showAllDistricts ? districts : districts.slice(0, 3)).map((district) => (
-            <View key={district.id} style={styles.districtItem}>
-              <ThemedText style={styles.districtTitle}>{district.name}</ThemedText>
-              <ThemedText style={styles.districtSubtitle}>
-                {places.filter((place) => place.districtId === district.id).length} mekan
-              </ThemedText>
-            </View>
-          ))}
-        </View>
-        <View style={styles.samplePlaces}>
-          {samplePlaces.map((place) => (
-            <View key={place.id} style={styles.samplePlaceItem}>
-              <ThemedText style={styles.samplePlaceName}>{place.name}</ThemedText>
-              <ThemedText style={styles.samplePlaceNotes}>{place.specialties.join(', ')}</ThemedText>
-            </View>
-          ))}
-        </View>
-      </View>
-    </ThemedView>
+      </ThemedView>
+    </Pressable>
   );
 }
 
