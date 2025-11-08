@@ -1,31 +1,151 @@
-import React, { useMemo } from 'react';
+/**
+ * ROTA DETAY EKRANI
+ * 
+ * - Rota bilgileri
+ * - Duraklar listesi
+ * - Harita (opsiyonel)
+ * - Rating & Reviews
+ * - Rating ekleme
+ * - Kaydetme
+ */
+
+import React, { useEffect, useState } from 'react';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  View,
+} from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors } from '@/constants/theme';
+import { useAuth } from '@/contexts/AuthContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useGurumeData } from '@/hooks/use-gurume-data';
+import { routesService } from '@/services/routes.service';
+import { ratingsService } from '@/services/ratings.service';
+import type { Route, RouteRating } from '@/types';
 
 export default function RouteDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const router = useRouter();
   const colorScheme = useColorScheme() ?? 'light';
-  const { getRouteById, getCityById, getPlaceById } = useGurumeData();
+  const router = useRouter();
+  const { user } = useAuth();
 
-  const route = id ? getRouteById(id) : undefined;
+  const [route, setRoute] = useState<Route | null>(null);
+  const [ratings, setRatings] = useState<RouteRating[]>([]);
+  const [userRating, setUserRating] = useState<RouteRating | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [showRatingForm, setShowRatingForm] = useState(false);
 
-  const city = useMemo(() => (route ? getCityById(route.cityId) : undefined), [route, getCityById]);
+  // Rating form state
+  const [ratingScore, setRatingScore] = useState(5);
+  const [ratingComment, setRatingComment] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (id) {
+      loadRouteDetails();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+
+  const loadRouteDetails = async () => {
+    if (!id) return;
+
+    try {
+      const routeData = await routesService.getRouteById(id);
+      setRoute(routeData);
+
+      const ratingsData = await ratingsService.getRatingsByRoute(id);
+      setRatings(ratingsData);
+
+      if (user) {
+        const userRatingData = await ratingsService.getUserRatingForRoute(user.id, id);
+        setUserRating(userRatingData);
+      }
+    } catch (error) {
+      console.error('loadRouteDetails error:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmitRating = async () => {
+    if (!user) {
+      Alert.alert('Giriş Gerekli', 'Değerlendirme yapmak için giriş yapmalısınız.', [
+        { text: 'İptal', style: 'cancel' },
+        { text: 'Giriş Yap', onPress: () => router.push('/auth/login') },
+      ]);
+      return;
+    }
+
+    if (!id) return;
+
+    if (!ratingComment.trim()) {
+      Alert.alert('Hata', 'Lütfen bir yorum yazın.');
+      return;
+    }
+
+    setSubmitting(true);
+    const result = await ratingsService.createRating(
+      {
+        routeId: id,
+        score: ratingScore,
+        comment: ratingComment,
+        visitedAt: new Date().toISOString().split('T')[0],
+      },
+      user.id
+    );
+    setSubmitting(false);
+
+    if (result.success) {
+      Alert.alert('Başarılı', 'Değerlendirmeniz kaydedildi. Teşekkürler!');
+      setShowRatingForm(false);
+      setRatingComment('');
+      loadRouteDetails();
+    } else {
+      Alert.alert('Hata', result.error?.message || 'Değerlendirme kaydedilemedi.');
+    }
+  };
+
+  const handleSaveRoute = async () => {
+    if (!user) {
+      router.push('/auth/login');
+      return;
+    }
+
+    if (!id) return;
+
+    const result = await routesService.saveRoute(user.id, id);
+    if (result.success) {
+      Alert.alert('Başarılı', 'Rota kaydedildi.');
+    }
+  };
+
+  if (loading) {
+    return (
+      <ThemedView style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={Colors[colorScheme].primary} />
+      </ThemedView>
+    );
+  }
 
   if (!route) {
     return (
-      <ThemedView style={styles.centered}>
-        <ThemedText type="title">Rota bulunamadı</ThemedText>
-        <ThemedText style={styles.helperText}>Listeye geri dönüp tekrar dener misin?</ThemedText>
-        <Pressable onPress={() => router.back()} style={styles.backButton}>
-          <ThemedText style={styles.backButtonText}>Geri Dön</ThemedText>
+      <ThemedView style={styles.loadingContainer}>
+        <ThemedText>Rota bulunamadı.</ThemedText>
+        <Pressable
+          style={[styles.button, { backgroundColor: Colors[colorScheme].primary }]}
+          onPress={() => router.back()}>
+          <ThemedText style={styles.buttonText} lightColor="#FFFFFF">
+            Geri Dön
+          </ThemedText>
         </Pressable>
       </ThemedView>
     );
@@ -33,142 +153,210 @@ export default function RouteDetailScreen() {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Pressable onPress={() => router.back()} style={styles.backLink} accessibilityRole="button">
-        <ThemedText style={styles.backLinkText}>← Rotalara dön</ThemedText>
-      </Pressable>
+      {/* Cover Image */}
+      <Image source={{ uri: route.coverImage }} style={styles.coverImage} />
 
-      <ThemedView style={styles.coverCard}>
-        <Image source={{ uri: route.coverImage }} style={styles.coverImage} />
-        <View style={styles.coverOverlay} />
-        <View style={styles.coverContent}>
-          <ThemedText type="title" style={styles.coverTitle}>
-            {route.title}
-          </ThemedText>
-          <ThemedText style={styles.coverMeta}>
-            {city?.name ?? 'Bilinmeyen şehir'} • {route.stops.length} durak • {route.durationMinutes} dk •
-            ⭐ {route.averageRating.toFixed(1)}
-          </ThemedText>
-          <View style={styles.authorRow}>
-            <View style={[styles.authorAvatar, { backgroundColor: Colors[colorScheme].tint }]}>
-              <ThemedText style={styles.authorInitials} lightColor="#FFFFFF" darkColor="#1D1411">
-                {route.author.name
-                  .split(' ')
-                  .map((part) => part[0])
-                  .join('')
-                  .slice(0, 2)
-                  .toUpperCase()}
-              </ThemedText>
-            </View>
-            <View style={styles.authorInfo}>
-              <ThemedText style={styles.authorName}>{route.author.name}</ThemedText>
-              <ThemedText style={styles.authorTitle}>{route.author.title}</ThemedText>
+      {/* Header */}
+      <ThemedView style={styles.header}>
+        <View style={styles.headerTop}>
+          <View style={styles.titleSection}>
+            <ThemedText type="title" style={styles.title}>
+              {route.title}
+            </ThemedText>
+            <View style={styles.ratingRow}>
+              <ThemedText style={styles.rating}>⭐ {route.averageRating.toFixed(1)}</ThemedText>
+              <ThemedText style={styles.ratingCount}>({route.ratingCount} değerlendirme)</ThemedText>
             </View>
           </View>
         </View>
-      </ThemedView>
 
-      <ThemedView style={styles.section}>
-        <ThemedText type="subtitle">Rota Özeti</ThemedText>
-        <ThemedText style={styles.sectionBody}>{route.description}</ThemedText>
         <View style={styles.metaRow}>
-          <MetaTile label="Süre" value={`${route.durationMinutes} dk`} />
-          <MetaTile label="Mesafe" value={`${route.distanceKm.toFixed(1)} km`} />
-          <MetaTile label="Puan" value={`⭐ ${route.averageRating.toFixed(1)}`} />
+          <MetaBadge
+            icon="📍"
+            label={`${route.stops?.length || 0} durak`}
+            colorScheme={colorScheme}
+          />
+          <MetaBadge icon="⏱️" label={`${route.durationMinutes} dk`} colorScheme={colorScheme} />
+          <MetaBadge
+            icon="🚶"
+            label={`${route.distanceKm.toFixed(1)} km`}
+            colorScheme={colorScheme}
+          />
         </View>
-        <View style={styles.tagRow}>
+
+        <View style={styles.authorRow}>
+          <ThemedText style={styles.authorLabel}>Oluşturan:</ThemedText>
+          <ThemedText style={styles.authorName}>@{route.author.username}</ThemedText>
+          {route.author.isVerified && <ThemedText>✓</ThemedText>}
+        </View>
+
+        <ThemedText style={styles.description}>{route.description}</ThemedText>
+
+        <View style={styles.tagsRow}>
           {route.tags.map((tag) => (
-            <TagPill key={tag} label={tag} />
+            <View
+              key={tag}
+              style={[
+                styles.tag,
+                {
+                  backgroundColor: Colors[colorScheme].badgeYellow,
+                  borderColor: Colors[colorScheme].accent,
+                },
+              ]}>
+              <ThemedText style={styles.tagText}>#{tag}</ThemedText>
+            </View>
           ))}
         </View>
+
+        <View style={styles.actionsRow}>
+          <Pressable
+            style={[styles.actionButton, { backgroundColor: Colors[colorScheme].primary }]}
+            onPress={() => setShowRatingForm(true)}>
+            <ThemedText style={styles.actionButtonText} lightColor="#FFFFFF">
+              Değerlendir
+            </ThemedText>
+          </Pressable>
+          <Pressable
+            style={[
+              styles.actionButton,
+              { backgroundColor: Colors[colorScheme].secondary },
+            ]}
+            onPress={handleSaveRoute}>
+            <ThemedText style={styles.actionButtonText} lightColor="#FFFFFF">
+              Kaydet
+            </ThemedText>
+          </Pressable>
+        </View>
       </ThemedView>
 
-      <ThemedView style={styles.section}>
-        <ThemedText type="subtitle">Duraklar</ThemedText>
-        <View style={styles.stopList}>
-          {route.stops.map((stop) => {
-            const place = getPlaceById(stop.placeId);
-
-            if (!place) {
-              return null;
-            }
-
-            return (
-              <ThemedView key={stop.placeId} style={styles.stopCard}>
-                <Image source={{ uri: place.heroImage }} style={styles.stopImage} />
-                <View style={styles.stopBody}>
-                  <View style={styles.stopHeader}>
-                    <View style={styles.stopOrder}>
-                      <ThemedText style={styles.stopOrderText}>{stop.order}</ThemedText>
-                    </View>
-                    <View style={styles.stopTitleGroup}>
-                      <ThemedText type="subtitle" style={styles.stopTitle}>
-                        {place.name}
+      {/* Stops */}
+      {route.stops && route.stops.length > 0 && (
+        <ThemedView style={styles.section}>
+          <ThemedText type="subtitle" style={styles.sectionTitle}>
+            Duraklar ({route.stops.length})
+          </ThemedText>
+          {route.stops.map((stop, index) => (
+            <View
+              key={stop.order}
+              style={[styles.stopCard, { borderColor: Colors[colorScheme].border }]}>
+              <View style={styles.stopNumber}>
+                <ThemedText style={styles.stopNumberText}>{index + 1}</ThemedText>
+              </View>
+              <View style={styles.stopContent}>
+                <ThemedText style={styles.stopHighlight}>{stop.highlight}</ThemedText>
+                {stop.tastingNotes && stop.tastingNotes.length > 0 && (
+                  <View style={styles.tastingNotes}>
+                    {stop.tastingNotes.map((note, i) => (
+                      <ThemedText key={i} style={styles.tastingNote}>
+                        • {note}
                       </ThemedText>
-                      <ThemedText style={styles.stopDistrict}>{place.summary}</ThemedText>
-                    </View>
-                  </View>
-                  <ThemedText style={styles.stopHighlight}>{stop.highlight}</ThemedText>
-                  <View style={styles.tastingList}>
-                    {stop.tastingNotes.map((note) => (
-                      <View key={note} style={styles.tastingItem}>
-                        <ThemedText style={styles.tastingText}>{note}</ThemedText>
-                      </View>
                     ))}
                   </View>
-                  <View style={styles.scoreRow}>
-                    <ScoreChip label="Hız" value={place.speedScore} />
-                    <ScoreChip label="Temizlik" value={place.cleanlinessScore} />
-                    <ScoreChip label="Fiyat" value={place.valueScore} />
-                  </View>
-                </View>
-              </ThemedView>
-            );
-          })}
-        </View>
-      </ThemedView>
+                )}
+                <ThemedText style={styles.stopMeta}>⏱️ {stop.dwellMinutes} dakika</ThemedText>
+              </View>
+            </View>
+          ))}
+        </ThemedView>
+      )}
 
-      <ThemedView style={styles.section}>
-        <ThemedText type="subtitle">Planlama Notları</ThemedText>
-        <View style={styles.noteCard}>
-          <ThemedText style={styles.noteTitle}>Zamanlama</ThemedText>
-          <ThemedText style={styles.noteBody}>
-            Duraklar arası ortalama {Math.round(route.durationMinutes / Math.max(route.stops.length, 1))} dakikada
-            tamamlanıyor. Akşam saatlerinde yoğunluk için 15 dk ekstra pay bırak.
+      {/* Rating Form */}
+      {showRatingForm && !userRating && (
+        <ThemedView style={[styles.ratingForm, { borderColor: Colors[colorScheme].border }]}>
+          <ThemedText type="subtitle">Rotayı Değerlendir</ThemedText>
+
+          <View style={styles.starsRow}>
+            {[1, 2, 3, 4, 5].map((star) => (
+              <Pressable key={star} onPress={() => setRatingScore(star)}>
+                <ThemedText style={styles.star}>{star <= ratingScore ? '⭐' : '☆'}</ThemedText>
+              </Pressable>
+            ))}
+          </View>
+
+          <TextInput
+            style={[
+              styles.ratingInput,
+              {
+                borderColor: Colors[colorScheme].border,
+                backgroundColor: Colors[colorScheme].cardBackground,
+                color: Colors[colorScheme].text,
+              },
+            ]}
+            placeholder="Deneyiminizi paylaşın..."
+            placeholderTextColor={Colors[colorScheme].textLight}
+            value={ratingComment}
+            onChangeText={setRatingComment}
+            multiline
+            numberOfLines={4}
+          />
+
+          <View style={styles.ratingActions}>
+            <Pressable
+              style={[styles.button, { backgroundColor: Colors[colorScheme].primary }]}
+              onPress={handleSubmitRating}
+              disabled={submitting}>
+              {submitting ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <ThemedText style={styles.buttonText} lightColor="#FFFFFF">
+                  Gönder
+                </ThemedText>
+              )}
+            </Pressable>
+            <Pressable
+              style={[styles.button, { backgroundColor: Colors[colorScheme].border }]}
+              onPress={() => setShowRatingForm(false)}>
+              <ThemedText style={styles.buttonText}>İptal</ThemedText>
+            </Pressable>
+          </View>
+        </ThemedView>
+      )}
+
+      {/* Ratings List */}
+      {ratings.length > 0 && (
+        <ThemedView style={styles.section}>
+          <ThemedText type="subtitle" style={styles.sectionTitle}>
+            Değerlendirmeler ({ratings.length})
           </ThemedText>
-        </View>
-        <View style={styles.noteCard}>
-          <ThemedText style={styles.noteTitle}>Ulaşım</ThemedText>
-          <ThemedText style={styles.noteBody}>
-            Yürüme + toplu taşıma kombinasyonu önerilir. Kadıköy geçişinde vapur hatlarını kullan.
-          </ThemedText>
-        </View>
-      </ThemedView>
+          {ratings.map((rating) => (
+            <View
+              key={rating.id}
+              style={[styles.ratingCard, { borderColor: Colors[colorScheme].border }]}>
+              <View style={styles.ratingHeader}>
+                <View style={styles.ratingUser}>
+                  <ThemedText style={styles.ratingUsername}>@{rating.user?.username}</ThemedText>
+                  {rating.user?.isVerified && <ThemedText>✓</ThemedText>}
+                </View>
+                <ThemedText style={styles.ratingScore}>
+                  {'⭐'.repeat(rating.score)}
+                </ThemedText>
+              </View>
+              <ThemedText style={styles.ratingComment}>{rating.comment}</ThemedText>
+              <ThemedText style={styles.ratingDate}>
+                {new Date(rating.createdAt).toLocaleDateString('tr-TR')}
+              </ThemedText>
+            </View>
+          ))}
+        </ThemedView>
+      )}
     </ScrollView>
   );
 }
 
-function MetaTile({ label, value }: { label: string; value: string }) {
+function MetaBadge({
+  icon,
+  label,
+  colorScheme,
+}: {
+  icon: string;
+  label: string;
+  colorScheme: 'light' | 'dark';
+}) {
   return (
-    <View style={styles.metaTile}>
-      <ThemedText style={styles.metaTileLabel}>{label}</ThemedText>
-      <ThemedText style={styles.metaTileValue}>{value}</ThemedText>
-    </View>
-  );
-}
-
-function TagPill({ label }: { label: string }) {
-  return (
-    <View style={styles.tagPill}>
-      <ThemedText style={styles.tagPillText}>#{label}</ThemedText>
-    </View>
-  );
-}
-
-function ScoreChip({ label, value }: { label: string; value: number }) {
-  return (
-    <View style={styles.scoreChip}>
-      <ThemedText style={styles.scoreChipLabel}>{label}</ThemedText>
-      <ThemedText style={styles.scoreChipValue}>{value.toFixed(1)}</ThemedText>
+    <View style={[styles.metaBadge, { backgroundColor: Colors[colorScheme].badgeOrange }]}>
+      <ThemedText style={styles.metaBadgeText}>
+        {icon} {label}
+      </ThemedText>
     </View>
   );
 }
@@ -176,226 +364,212 @@ function ScoreChip({ label, value }: { label: string; value: number }) {
 const styles = StyleSheet.create({
   container: {
     paddingBottom: 40,
-    gap: 24,
   },
-  centered: {
+  loadingContainer: {
     flex: 1,
-    alignItems: 'center',
     justifyContent: 'center',
-    padding: 24,
+    alignItems: 'center',
     gap: 16,
   },
-  helperText: {
-    textAlign: 'center',
-  },
-  backButton: {
-    marginTop: 12,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 18,
-    backgroundColor: '#FFE0C9',
-  },
-  backButtonText: {
-    fontWeight: '600',
-  },
-  backLink: {
-    marginTop: 16,
-    marginHorizontal: 20,
-  },
-  backLinkText: {
-    fontWeight: '600',
-  },
-  coverCard: {
-    marginTop: 8,
-    marginHorizontal: 20,
-    borderRadius: 28,
-    overflow: 'hidden',
-    position: 'relative',
-  },
   coverImage: {
-    height: 220,
     width: '100%',
+    height: 250,
   },
-  coverOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.25)',
+  header: {
+    padding: 20,
+    gap: 16,
   },
-  coverContent: {
-    position: 'absolute',
-    left: 20,
-    right: 20,
-    bottom: 20,
-    gap: 12,
-  },
-  coverTitle: {
-    color: '#FFFFFF',
-  },
-  coverMeta: {
-    color: '#F5E2D5',
-  },
-  authorRow: {
+  headerTop: {
     flexDirection: 'row',
-    gap: 12,
-    alignItems: 'center',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
   },
-  authorAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
+  titleSection: {
+    flex: 1,
+    gap: 8,
   },
-  authorInitials: {
+  title: {
+    fontSize: 28,
+  },
+  ratingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  rating: {
+    fontSize: 18,
     fontWeight: '700',
   },
-  authorInfo: {
-    gap: 2,
-  },
-  authorName: {
-    color: '#FFFFFF',
-    fontWeight: '600',
-  },
-  authorTitle: {
-    color: '#FCE8DD',
-    fontSize: 13,
-  },
-  section: {
-    marginHorizontal: 20,
-    marginTop: 24,
-    gap: 12,
-  },
-  sectionBody: {
-    lineHeight: 22,
+  ratingCount: {
+    fontSize: 14,
   },
   metaRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
-  },
-  metaTile: {
-    flexBasis: '32%',
-    minWidth: 110,
-    borderRadius: 16,
-    backgroundColor: '#FFE9DB',
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    gap: 4,
-  },
-  metaTileLabel: {
-    fontSize: 12,
-    color: '#8C6F60',
-    textTransform: 'uppercase',
-  },
-  metaTileValue: {
-    fontWeight: '600',
-  },
-  tagRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
     gap: 8,
   },
-  tagPill: {
-    borderRadius: 999,
-    backgroundColor: '#FFDCC5',
+  metaBadge: {
+    borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 6,
   },
-  tagPillText: {
-    fontWeight: '600',
-    fontSize: 13,
-  },
-  stopList: {
-    gap: 16,
-  },
-  stopCard: {
-    borderRadius: 20,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#F5CBB0',
-  },
-  stopImage: {
-    height: 140,
-    width: '100%',
-  },
-  stopBody: {
-    padding: 16,
-    gap: 12,
-  },
-  stopHeader: {
-    flexDirection: 'row',
-    gap: 12,
-    alignItems: 'flex-start',
-  },
-  stopOrder: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#FFE0C9',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  stopOrderText: {
-    fontWeight: '700',
-  },
-  stopTitleGroup: {
-    flex: 1,
-    gap: 4,
-  },
-  stopTitle: {
-    fontSize: 20,
-  },
-  stopDistrict: {
-    color: '#8C6F60',
-  },
-  stopHighlight: {
-    lineHeight: 20,
-  },
-  tastingList: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  tastingItem: {
-    backgroundColor: '#FFF2E8',
-    borderRadius: 14,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  tastingText: {
+  metaBadgeText: {
     fontSize: 13,
     fontWeight: '600',
   },
-  scoreRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  scoreChip: {
+  authorRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    backgroundColor: '#FFE9DB',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-  },
-  scoreChipLabel: {
-    fontWeight: '600',
-    fontSize: 12,
-  },
-  scoreChipValue: {
-    fontWeight: '600',
-  },
-  noteCard: {
-    borderRadius: 18,
-    backgroundColor: '#FFF2E8',
-    padding: 16,
     gap: 6,
   },
-  noteTitle: {
+  authorLabel: {
+    fontSize: 14,
+  },
+  authorName: {
+    fontSize: 14,
     fontWeight: '600',
   },
-  noteBody: {
-    lineHeight: 20,
+  description: {
+    lineHeight: 24,
+    fontSize: 16,
+  },
+  tagsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  tag: {
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  tagText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  actionsRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  actionButton: {
+    flex: 1,
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  actionButtonText: {
+    fontWeight: '700',
+    fontSize: 15,
+  },
+  section: {
+    padding: 20,
+    gap: 16,
+  },
+  sectionTitle: {
+    fontSize: 22,
+  },
+  stopCard: {
+    flexDirection: 'row',
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 16,
+    gap: 16,
+  },
+  stopNumber: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#FF6B35',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  stopNumberText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 18,
+  },
+  stopContent: {
+    flex: 1,
+    gap: 8,
+  },
+  stopHighlight: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  tastingNotes: {
+    gap: 4,
+  },
+  tastingNote: {
+    fontSize: 14,
+  },
+  stopMeta: {
+    fontSize: 12,
+  },
+  ratingForm: {
+    marginHorizontal: 20,
+    marginBottom: 20,
+    padding: 20,
+    borderRadius: 20,
+    borderWidth: 1,
+    gap: 16,
+  },
+  starsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'center',
+  },
+  star: {
+    fontSize: 32,
+  },
+  ratingInput: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 16,
+    minHeight: 120,
+    textAlignVertical: 'top',
+  },
+  ratingActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  button: {
+    flex: 1,
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  buttonText: {
+    fontWeight: '700',
+    fontSize: 15,
+  },
+  ratingCard: {
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 16,
+    gap: 12,
+  },
+  ratingHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  ratingUser: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  ratingUsername: {
+    fontWeight: '600',
+  },
+  ratingScore: {
+    fontSize: 16,
+  },
+  ratingComment: {
+    lineHeight: 22,
+  },
+  ratingDate: {
+    fontSize: 12,
   },
 });

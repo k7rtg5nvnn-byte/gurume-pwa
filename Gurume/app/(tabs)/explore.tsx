@@ -1,382 +1,468 @@
-import React, { useMemo, useState } from 'react';
+/**
+ * KEŞFETİNDEN EKRANI
+ * 
+ * - Gelişmiş arama
+ * - Şehir filtreleme
+ * - Puan filtreleme
+ * - Sıralama seçenekleri
+ * - Rotaları listele
+ */
+
+import React, { useEffect, useState } from 'react';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { FlatList, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Picker } from '@react-navigation/elements';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useGurumeData } from '@/hooks/use-gurume-data';
+import { routesService } from '@/services/routes.service';
+import { turkeyCities } from '@/data/turkey-cities-districts';
+import type { Route } from '@/types';
 
 export default function ExploreScreen() {
-  const [searchTerm, setSearchTerm] = useState('');
   const colorScheme = useColorScheme() ?? 'light';
   const router = useRouter();
-  const { data, getCityById, getPlacesByCityId, getRoutesByCityId } = useGurumeData();
 
-  const stats = useMemo(() => {
-    return data.cities.map((city) => {
-      const places = getPlacesByCityId(city.id);
-      const districts = data.districts.filter((district) => district.cityId === city.id);
-      const routes = getRoutesByCityId(city.id);
+  const [routes, setRoutes] = useState<Route[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  
+  // Filters
+  const [selectedCityId, setSelectedCityId] = useState<string>('');
+  const [minRating, setMinRating] = useState<number>(0);
+  const [sortBy, setSortBy] = useState<'rating' | 'popular' | 'newest'>('rating');
 
-      return {
-        cityId: city.id,
-        placeCount: places.length,
-        districtCount: districts.length,
-        routeCount: routes.length,
+  useEffect(() => {
+    loadRoutes();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCityId, minRating, sortBy]);
+
+  const loadRoutes = async () => {
+    setLoading(true);
+    try {
+      const filters = {
+        cityIds: selectedCityId ? [selectedCityId] : undefined,
+        minRating: minRating > 0 ? minRating : undefined,
+        sortBy,
       };
-    });
-  }, [data.cities, data.districts, getPlacesByCityId, getRoutesByCityId]);
 
-  const filteredCities = useMemo(() => {
-    if (!searchTerm.trim()) {
-      return data.cities;
+      const data = await routesService.getAllRoutes(filters);
+      setRoutes(data);
+    } catch (error) {
+      console.error('loadRoutes error:', error);
+    } finally {
+      setLoading(false);
     }
+  };
 
+  // Search filtresi
+  const filteredRoutes = routes.filter((route) => {
+    if (!searchTerm.trim()) return true;
+    
     const lowered = searchTerm.toLowerCase();
-    const matchingCityIds = new Set<string>();
-
-    data.cities.forEach((city) => {
-      if (city.name.toLowerCase().includes(lowered)) {
-        matchingCityIds.add(city.id);
-      }
-    });
-
-    data.districts.forEach((district) => {
-      if (district.name.toLowerCase().includes(lowered)) {
-        matchingCityIds.add(district.cityId);
-      }
-    });
-
-    data.places.forEach((place) => {
-      if (place.name.toLowerCase().includes(lowered)) {
-        matchingCityIds.add(place.cityId);
-      }
-    });
-
-    return data.cities.filter((city) => matchingCityIds.has(city.id));
-  }, [data.cities, data.districts, data.places, searchTerm]);
+    return (
+      route.title.toLowerCase().includes(lowered) ||
+      route.description.toLowerCase().includes(lowered) ||
+      route.tags.some((tag) => tag.toLowerCase().includes(lowered))
+    );
+  });
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <ThemedView style={styles.header}>
-        <ThemedText type="title">Türkiye Lezzet Haritası</ThemedText>
-        <ThemedText style={styles.headerSubtitle}>
-          Şehir, ilçe veya mekan adı yaz; topluluğun önerdiği rotaları keşfet.
+        <ThemedText type="title">Keşfet</ThemedText>
+        <ThemedText style={styles.subtitle}>
+          Türkiye&apos;nin en iyi lezzet rotalarını keşfet ve favorilerine ekle.
         </ThemedText>
-        <View style={[styles.searchContainer, { borderColor: Colors[colorScheme].tabIconDefault }]}>
+
+        {/* Search */}
+        <View style={[styles.searchContainer, { borderColor: Colors[colorScheme].border }]}>
+          <ThemedText style={styles.searchIcon}>🔍</ThemedText>
           <TextInput
-            placeholder="Şehir, ilçe veya mekan ara"
-            placeholderTextColor="#C9A793"
+            style={[styles.searchInput, { color: Colors[colorScheme].text }]}
+            placeholder="Rota ara..."
+            placeholderTextColor={Colors[colorScheme].textLight}
             value={searchTerm}
             onChangeText={setSearchTerm}
-            style={styles.searchInput}
           />
         </View>
       </ThemedView>
 
-      <ThemedView style={styles.summaryRow}>
-        {stats.map((item) => {
-          const city = getCityById(item.cityId);
-          if (!city) return null;
+      {/* Filters */}
+      <ThemedView style={styles.filtersSection}>
+        <ThemedText style={styles.filtersTitle}>Filtrele</ThemedText>
 
-          return (
-            <View key={city.id} style={styles.summaryCard}>
-              <ThemedText type="subtitle" style={styles.summaryCity}>
-                {city.name}
-              </ThemedText>
-              <ThemedText style={styles.summaryMetrics}>
-                {item.districtCount} ilçe • {item.placeCount} mekan • {item.routeCount} rota
-              </ThemedText>
+        <View style={styles.filterRow}>
+          <View style={[styles.filterItem, { flex: 2 }]}>
+            <ThemedText style={styles.filterLabel}>Şehir</ThemedText>
+            <View
+              style={[
+                styles.pickerContainer,
+                {
+                  borderColor: Colors[colorScheme].border,
+                  backgroundColor: Colors[colorScheme].cardBackground,
+                },
+              ]}>
+              <Picker
+                selectedValue={selectedCityId}
+                onValueChange={setSelectedCityId}
+                style={{ color: Colors[colorScheme].text }}>
+                <Picker.Item label="Tüm Şehirler" value="" />
+                {turkeyCities.map((city) => (
+                  <Picker.Item key={city.id} label={city.name} value={city.id} />
+                ))}
+              </Picker>
             </View>
-          );
-        })}
+          </View>
+
+          <View style={[styles.filterItem, { flex: 1 }]}>
+            <ThemedText style={styles.filterLabel}>Min Puan</ThemedText>
+            <View
+              style={[
+                styles.pickerContainer,
+                {
+                  borderColor: Colors[colorScheme].border,
+                  backgroundColor: Colors[colorScheme].cardBackground,
+                },
+              ]}>
+              <Picker
+                selectedValue={minRating}
+                onValueChange={(value) => setMinRating(value)}
+                style={{ color: Colors[colorScheme].text }}>
+                <Picker.Item label="Tümü" value={0} />
+                <Picker.Item label="3+" value={3} />
+                <Picker.Item label="4+" value={4} />
+                <Picker.Item label="4.5+" value={4.5} />
+              </Picker>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.filterItem}>
+          <ThemedText style={styles.filterLabel}>Sıralama</ThemedText>
+          <View style={styles.sortButtons}>
+            <Pressable
+              style={[
+                styles.sortButton,
+                sortBy === 'rating' && {
+                  backgroundColor: Colors[colorScheme].primary,
+                },
+                { borderColor: Colors[colorScheme].border },
+              ]}
+              onPress={() => setSortBy('rating')}>
+              <ThemedText
+                style={styles.sortButtonText}
+                lightColor={sortBy === 'rating' ? '#FFFFFF' : Colors.light.text}
+                darkColor={sortBy === 'rating' ? '#1D1411' : Colors.dark.text}>
+                Puana Göre
+              </ThemedText>
+            </Pressable>
+
+            <Pressable
+              style={[
+                styles.sortButton,
+                sortBy === 'popular' && {
+                  backgroundColor: Colors[colorScheme].primary,
+                },
+                { borderColor: Colors[colorScheme].border },
+              ]}
+              onPress={() => setSortBy('popular')}>
+              <ThemedText
+                style={styles.sortButtonText}
+                lightColor={sortBy === 'popular' ? '#FFFFFF' : Colors.light.text}
+                darkColor={sortBy === 'popular' ? '#1D1411' : Colors.dark.text}>
+                Popüler
+              </ThemedText>
+            </Pressable>
+
+            <Pressable
+              style={[
+                styles.sortButton,
+                sortBy === 'newest' && {
+                  backgroundColor: Colors[colorScheme].primary,
+                },
+                { borderColor: Colors[colorScheme].border },
+              ]}
+              onPress={() => setSortBy('newest')}>
+              <ThemedText
+                style={styles.sortButtonText}
+                lightColor={sortBy === 'newest' ? '#FFFFFF' : Colors.light.text}
+                darkColor={sortBy === 'newest' ? '#1D1411' : Colors.dark.text}>
+                Yeni
+              </ThemedText>
+            </Pressable>
+          </View>
+        </View>
       </ThemedView>
 
-      <ThemedView style={styles.sectionHeader}>
-        <ThemedText type="subtitle">Şehir Bazlı Rotayı Bul</ThemedText>
-        <ThemedText style={styles.sectionDescription}>
-          İlçeleri ve önerilen mekanları incele, rotaya eklemek için favorilerini seç.
+      {/* Results */}
+      <ThemedView style={styles.resultsSection}>
+        <ThemedText style={styles.resultsTitle}>
+          Sonuçlar ({filteredRoutes.length})
         </ThemedText>
-      </ThemedView>
 
-      <FlatList
-        data={filteredCities}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.cityList}
-        ItemSeparatorComponent={() => <View style={styles.listSeparator} />}
-        renderItem={({ item }) => (
-          <CityDetailCard
-            key={item.id}
-            cityId={item.id}
-            colorScheme={colorScheme}
-            showAllDistricts={filteredCities.length === 1}
-            onPressCity={() => router.push(`/city/${item.id}`)}
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={Colors[colorScheme].primary} />
+          </View>
+        ) : filteredRoutes.length === 0 ? (
+          <View style={styles.emptyState}>
+            <ThemedText style={styles.emptyText}>Rota bulunamadı.</ThemedText>
+            <ThemedText style={styles.emptyHint}>
+              Farklı filtreler deneyin veya tüm rotaları görüntüleyin.
+            </ThemedText>
+          </View>
+        ) : (
+          <FlatList
+            data={filteredRoutes}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
+              <RouteCard
+                route={item}
+                colorScheme={colorScheme}
+                onPress={() => router.push(`/route/${item.id}`)}
+              />
+            )}
+            ItemSeparatorComponent={() => <View style={styles.separator} />}
+            scrollEnabled={false}
           />
         )}
-      />
-
-      <ThemedView style={styles.sectionHeader}>
-        <ThemedText type="subtitle">Topluluk Rotaları</ThemedText>
-        <ThemedText style={styles.sectionDescription}>
-          Kullanıcıların yeni paylaştığı rotalar ve önerilen tatlar.
-        </ThemedText>
       </ThemedView>
-
-      <View style={styles.routeGrid}>
-        {data.routes.map((route) => (
-          <Pressable
-            key={route.id}
-            onPress={() => router.push(`/route/${route.id}`)}
-            accessibilityRole="button">
-            <ThemedView style={styles.routeTile}>
-              <Image source={{ uri: route.coverImage }} style={styles.routeTileImage} />
-              <View style={styles.routeTileContent}>
-                <ThemedText style={styles.routeTileTitle}>{route.title}</ThemedText>
-                <ThemedText style={styles.routeTileMeta}>
-                  {route.stops.length} durak • ⭐ {route.averageRating.toFixed(1)} ({route.ratingCount})
-                </ThemedText>
-              </View>
-            </ThemedView>
-          </Pressable>
-        ))}
-      </View>
     </ScrollView>
   );
 }
 
-function CityDetailCard({
-  cityId,
+function RouteCard({
+  route,
   colorScheme,
-  showAllDistricts,
-  onPressCity,
+  onPress,
 }: {
-  cityId: string;
+  route: Route;
   colorScheme: 'light' | 'dark';
-  showAllDistricts: boolean;
-  onPressCity: () => void;
+  onPress: () => void;
 }) {
-  const { getCityById, getPlacesByCityId, data, getRoutesByCityId, getPlacesByDistrictId } = useGurumeData();
-  const city = getCityById(cityId);
-  if (!city) return null;
-
-  const districts = data.districts.filter((district) => district.cityId === city.id);
-  const places = getPlacesByCityId(city.id);
-  const samplePlaces = places.slice(0, 3);
-  const routes = getRoutesByCityId(city.id);
-
   return (
-    <Pressable onPress={onPressCity} accessibilityRole="button">
-      <ThemedView
-        style={[
-          styles.cityDetailCard,
-          {
-            borderColor: Colors[colorScheme].tabIconDefault,
-          },
-        ]}>
-        <Image source={{ uri: city.heroImage }} style={styles.cityDetailImage} />
-        <View style={styles.cityDetailContent}>
-          <ThemedText type="subtitle" style={styles.cityDetailTitle}>
-            {city.name}
+    <Pressable onPress={onPress} accessibilityRole="button">
+      <View style={[styles.routeCard, { borderColor: Colors[colorScheme].border }]}>
+        <Image source={{ uri: route.coverImage }} style={styles.routeImage} />
+        <View style={styles.routeContent}>
+          <View style={styles.routeHeader}>
+            <ThemedText style={styles.routeTitle} numberOfLines={1}>
+              {route.title}
+            </ThemedText>
+            <View style={styles.ratingBadge}>
+              <ThemedText style={styles.routeRating}>⭐ {route.averageRating.toFixed(1)}</ThemedText>
+              <ThemedText style={styles.ratingCount}>({route.ratingCount})</ThemedText>
+            </View>
+          </View>
+
+          <ThemedText style={styles.routeDesc} numberOfLines={2}>
+            {route.description}
           </ThemedText>
-          <ThemedText style={styles.cityDetailDescription}>{city.description}</ThemedText>
-          <View style={styles.cityDetailStats}>
-            <InfoBadge label={`${districts.length} ilçe`} />
-            <InfoBadge label={`${places.length} mekan`} />
-            <InfoBadge label={`${routes.length} rota`} />
+
+          <View style={styles.routeMeta}>
+            <ThemedText style={styles.metaText}>
+              📍 {route.stops?.length || 0} durak
+            </ThemedText>
+            <ThemedText style={styles.metaText}>⏱️ {route.durationMinutes} dk</ThemedText>
+            <ThemedText style={styles.metaText}>🚶 {route.distanceKm.toFixed(1)} km</ThemedText>
           </View>
-          <View style={styles.districtList}>
-            {(showAllDistricts ? districts : districts.slice(0, 3)).map((district) => (
-              <View key={district.id} style={styles.districtItem}>
-                <ThemedText style={styles.districtTitle}>{district.name}</ThemedText>
-                <ThemedText style={styles.districtSubtitle}>
-                  {getPlacesByDistrictId(district.id).length} mekan
-                </ThemedText>
-              </View>
-            ))}
-          </View>
-          <View style={styles.samplePlaces}>
-            {samplePlaces.map((place) => (
-              <View key={place.id} style={styles.samplePlaceItem}>
-                <ThemedText style={styles.samplePlaceName}>{place.name}</ThemedText>
-                <ThemedText style={styles.samplePlaceNotes}>{place.specialties.join(', ')}</ThemedText>
-              </View>
-            ))}
+
+          <View style={styles.routeFooter}>
+            <ThemedText style={styles.authorText}>@{route.author.username}</ThemedText>
+            <View style={styles.tags}>
+              {route.tags.slice(0, 2).map((tag) => (
+                <View
+                  key={tag}
+                  style={[
+                    styles.tag,
+                    {
+                      backgroundColor: Colors[colorScheme].badgeYellow,
+                      borderColor: Colors[colorScheme].accent,
+                    },
+                  ]}>
+                  <ThemedText style={styles.tagText}>#{tag}</ThemedText>
+                </View>
+              ))}
+            </View>
           </View>
         </View>
-      </ThemedView>
+      </View>
     </Pressable>
-  );
-}
-
-function InfoBadge({ label }: { label: string }) {
-  return (
-    <View style={styles.infoBadge}>
-      <ThemedText style={styles.infoBadgeText}>{label}</ThemedText>
-    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     paddingBottom: 40,
-    gap: 24,
   },
   header: {
     paddingTop: 24,
     paddingHorizontal: 20,
     gap: 12,
   },
-  headerSubtitle: {
+  subtitle: {
     lineHeight: 22,
   },
   searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     borderWidth: 1,
-    borderRadius: 18,
+    borderRadius: 16,
     paddingHorizontal: 16,
     paddingVertical: 12,
-  },
-  searchInput: {
-    fontSize: 16,
-  },
-  summaryRow: {
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 16,
-  },
-  summaryCard: {
-    flexBasis: '48%',
-    minWidth: 150,
-    padding: 16,
-    borderRadius: 18,
-    backgroundColor: '#FFE9DB',
-    gap: 6,
-  },
-  summaryCity: {
-    fontSize: 18,
-  },
-  summaryMetrics: {
-    fontSize: 14,
-    color: '#8C6F60',
-  },
-  sectionHeader: {
-    paddingHorizontal: 20,
-    marginTop: 8,
-    gap: 6,
-  },
-  sectionDescription: {
-    color: '#8C6F60',
-    lineHeight: 20,
-  },
-  cityList: {
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    gap: 20,
-  },
-  listSeparator: {
-    height: 20,
-  },
-  cityDetailCard: {
-    borderWidth: 1,
-    borderRadius: 24,
-    overflow: 'hidden',
-  },
-  cityDetailImage: {
-    height: 160,
-    width: '100%',
-  },
-  cityDetailContent: {
-    padding: 18,
-    gap: 12,
-  },
-  cityDetailTitle: {
-    fontSize: 22,
-  },
-  cityDetailDescription: {
-    lineHeight: 20,
-  },
-  cityDetailStats: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
     gap: 8,
   },
-  districtList: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
+  searchIcon: {
+    fontSize: 18,
   },
-  districtItem: {
-    borderRadius: 16,
-    backgroundColor: '#FDE6DA',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    gap: 2,
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
   },
-  districtTitle: {
-    fontWeight: '600',
-  },
-  districtSubtitle: {
-    fontSize: 12,
-    color: '#8C6F60',
-  },
-  samplePlaces: {
-    gap: 10,
-  },
-  samplePlaceItem: {
-    borderRadius: 14,
-    backgroundColor: '#FFF2E8',
-    padding: 12,
-    gap: 4,
-  },
-  samplePlaceName: {
-    fontWeight: '600',
-  },
-  samplePlaceNotes: {
-    fontSize: 13,
-    color: '#8C6F60',
-  },
-  infoBadge: {
-    backgroundColor: '#FFE0C9',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 14,
-  },
-  infoBadgeText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  routeGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
+  filtersSection: {
+    marginTop: 20,
     paddingHorizontal: 20,
     gap: 16,
-    marginTop: 12,
-    marginBottom: 32,
   },
-  routeTile: {
-    flexBasis: '48%',
-    borderRadius: 16,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#F5CBB0',
+  filtersTitle: {
+    fontSize: 18,
+    fontWeight: '700',
   },
-  routeTileImage: {
-    height: 120,
-    width: '100%',
+  filterRow: {
+    flexDirection: 'row',
+    gap: 12,
   },
-  routeTileContent: {
-    padding: 12,
-    gap: 4,
+  filterItem: {
+    gap: 8,
   },
-  routeTileTitle: {
+  filterLabel: {
+    fontSize: 14,
     fontWeight: '600',
   },
-  routeTileMeta: {
+  pickerContainer: {
+    borderWidth: 1,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  sortButtons: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  sortButton: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  sortButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  resultsSection: {
+    marginTop: 24,
+    paddingHorizontal: 20,
+    gap: 16,
+  },
+  resultsTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  loadingContainer: {
+    paddingVertical: 40,
+    alignItems: 'center',
+  },
+  emptyState: {
+    paddingVertical: 60,
+    alignItems: 'center',
+    gap: 8,
+  },
+  emptyText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  emptyHint: {
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  separator: {
+    height: 16,
+  },
+  routeCard: {
+    flexDirection: 'row',
+    borderWidth: 1,
+    borderRadius: 16,
+    overflow: 'hidden',
+    gap: 12,
+    padding: 12,
+  },
+  routeImage: {
+    width: 100,
+    height: 100,
+    borderRadius: 12,
+  },
+  routeContent: {
+    flex: 1,
+    gap: 8,
+  },
+  routeHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  routeTitle: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  ratingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  routeRating: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  ratingCount: {
+    fontSize: 11,
+  },
+  routeDesc: {
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  routeMeta: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  metaText: {
     fontSize: 12,
-    color: '#8C6F60',
+  },
+  routeFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  authorText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  tags: {
+    flexDirection: 'row',
+    gap: 4,
+  },
+  tag: {
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  tagText: {
+    fontSize: 10,
+    fontWeight: '600',
   },
 });

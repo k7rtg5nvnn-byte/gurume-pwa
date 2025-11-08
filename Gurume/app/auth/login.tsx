@@ -7,7 +7,6 @@
  * - Error handling
  */
 
-import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
 import {
@@ -64,7 +63,7 @@ export default function LoginScreen() {
               Gurume
             </ThemedText>
             <ThemedText style={styles.subtitle}>
-              Türkiye'yi lezzet rotalarıyla keşfet
+              Türkiye&apos;yi lezzet rotalarıyla keşfet
             </ThemedText>
           </View>
 

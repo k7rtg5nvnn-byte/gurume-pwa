@@ -91,7 +91,7 @@ export default function RegisterScreen() {
               Hesap Oluştur
             </ThemedText>
             <ThemedText style={styles.subtitle}>
-              Gurume'ye katıl ve rotalarını paylaş
+              Gurume&apos;ye katıl ve rotalarını paylaş
             </ThemedText>
           </View>
 
