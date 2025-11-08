@@ -1,29 +1,102 @@
 /**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
+ * GURUME RENK PALETİ
+ * 
+ * Turuncu, Kırmızı ve Sarı tonlarında premium görünüm
+ * - Primary: Turuncu tonları (CTA ve vurgu)
+ * - Secondary: Kırmızı tonları (önemli aksiyonlar)
+ * - Accent: Sarı tonları (bilgilendirme ve highlight)
  */
 
 import { Platform } from 'react-native';
 
-const tintColorLight = '#FF6B2C';
-const tintColorDark = '#FF8C46';
+// Ana renkler
+const primaryOrange = '#FF6B35';  // Canlı turuncu
+const deepOrange = '#E85D2C';     // Koyu turuncu
+const lightOrange = '#FFB088';    // Açık turuncu
+
+const warmRed = '#D84727';        // Sıcak kırmızı
+const lightRed = '#FF8866';       // Açık kırmızı
+
+const goldenYellow = '#FFC857';   // Altın sarısı
+const sunYellow = '#FFD885';      // Güneş sarısı
+const paleYellow = '#FFF4E0';     // Soluk sarı
+
+// Nötr renkler
+const darkBrown = '#2C1810';      // Koyu kahverengi (text)
+const mediumBrown = '#6B4423';    // Orta kahverengi
+const lightBrown = '#A67C52';     // Açık kahverengi
+const cream = '#FFF8F0';          // Krem
 
 export const Colors = {
   light: {
-    text: '#22110C',
-    background: '#FFF9F2',
-    tint: tintColorLight,
-    icon: '#B36B40',
-    tabIconDefault: '#C7977D',
-    tabIconSelected: tintColorLight,
+    // Temel renkler
+    text: darkBrown,
+    background: cream,
+    tint: primaryOrange,
+    
+    // UI elementleri
+    primary: primaryOrange,
+    secondary: warmRed,
+    accent: goldenYellow,
+    
+    // Icon'lar
+    icon: deepOrange,
+    tabIconDefault: lightBrown,
+    tabIconSelected: primaryOrange,
+    
+    // Kart ve border
+    cardBackground: '#FFFFFF',
+    border: '#FFE4D6',
+    borderLight: '#FFF0E6',
+    
+    // Badge ve etiketler
+    badgeOrange: '#FFDBC4',
+    badgeYellow: '#FFF4D6',
+    badgeRed: '#FFD4CC',
+    
+    // Text varyasyonları
+    textSecondary: mediumBrown,
+    textLight: lightBrown,
+    
+    // Başarı ve uyarı
+    success: '#4CAF50',
+    warning: goldenYellow,
+    error: warmRed,
   },
   dark: {
-    text: '#FCE8DD',
-    background: '#1D1411',
-    tint: tintColorDark,
-    icon: '#F1B491',
+    // Temel renkler
+    text: '#FFF0E6',
+    background: '#1A0F0A',
+    tint: lightOrange,
+    
+    // UI elementleri
+    primary: lightOrange,
+    secondary: lightRed,
+    accent: sunYellow,
+    
+    // Icon'lar
+    icon: sunYellow,
     tabIconDefault: '#B38267',
-    tabIconSelected: tintColorDark,
+    tabIconSelected: lightOrange,
+    
+    // Kart ve border
+    cardBackground: '#2C1810',
+    border: '#3D2416',
+    borderLight: '#4D3420',
+    
+    // Badge ve etiketler
+    badgeOrange: '#3D2416',
+    badgeYellow: '#3D3020',
+    badgeRed: '#3D1E16',
+    
+    // Text varyasyonları
+    textSecondary: '#C9A793',
+    textLight: '#8C6F60',
+    
+    // Başarı ve uyarı
+    success: '#66BB6A',
+    warning: sunYellow,
+    error: lightRed,
   },
 };
 
