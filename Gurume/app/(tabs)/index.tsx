@@ -19,6 +19,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/contexts/AuthContext';
 import { routesService } from '@/services/routes.service';
 import { turkeyCities } from '@/data/turkey-cities-districts';
+import { mockRoutes } from '@/data/mock-routes';
 import type { Route } from '@/types';
 
 export default function HomeScreen() {
@@ -40,13 +41,12 @@ export default function HomeScreen() {
 
   const loadRoutes = async () => {
     try {
-      // Top rated routes (puana göre sıralı)
-      const topRated = await routesService.getAllRoutes({ sortBy: 'rating' });
-      setTopRatedRoutes(topRated.slice(0, 5));
-
-      // Trending routes (view count + rating kombinasyonu)
-      const trending = await routesService.getAllRoutes({ sortBy: 'popular' });
-      setTrendingRoutes(trending.slice(0, 5));
+      // Mock data kullan (Supabase'de veri yoksa)
+      const sortedByRating = [...mockRoutes].sort((a, b) => b.averageRating - a.averageRating);
+      const sortedByPopular = [...mockRoutes].sort((a, b) => b.viewCount - a.viewCount);
+      
+      setTopRatedRoutes(sortedByRating.slice(0, 5));
+      setTrendingRoutes(sortedByPopular.slice(0, 5));
     } catch (error) {
       console.error('loadRoutes error:', error);
     } finally {

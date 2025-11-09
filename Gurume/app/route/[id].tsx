@@ -29,6 +29,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { routesService } from '@/services/routes.service';
 import { ratingsService } from '@/services/ratings.service';
+import { mockRoutes } from '@/data/mock-routes';
 import type { Route, RouteRating } from '@/types';
 
 export default function RouteDetailScreen() {
@@ -59,16 +60,13 @@ export default function RouteDetailScreen() {
     if (!id) return;
 
     try {
-      const routeData = await routesService.getRouteById(id);
-      setRoute(routeData);
+      // Mock data kullan
+      const routeData = mockRoutes.find(r => r.id === id);
+      setRoute(routeData || null);
 
-      const ratingsData = await ratingsService.getRatingsByRoute(id);
-      setRatings(ratingsData);
-
-      if (user) {
-        const userRatingData = await ratingsService.getUserRatingForRoute(user.id, id);
-        setUserRating(userRatingData);
-      }
+      // Mock ratings
+      setRatings([]);
+      setUserRating(null);
     } catch (error) {
       console.error('loadRouteDetails error:', error);
     } finally {

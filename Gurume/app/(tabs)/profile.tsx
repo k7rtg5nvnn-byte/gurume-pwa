@@ -29,6 +29,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { imageUploadService } from '@/services/image-upload.service';
 import { routesService } from '@/services/routes.service';
+import { mockRoutes } from '@/data/mock-routes';
 import type { Route } from '@/types';
 
 export default function ProfileScreen() {
@@ -59,7 +60,8 @@ export default function ProfileScreen() {
     if (!user) return;
 
     try {
-      const routes = await routesService.getUserRoutes(user.id);
+      // Mock data - kullanıcının rotalarını filtrele
+      const routes = mockRoutes.filter(r => r.authorId === user.id);
       setUserRoutes(routes);
     } catch (error) {
       console.error('loadUserRoutes error:', error);

@@ -19,6 +19,7 @@ import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { routesService } from '@/services/routes.service';
 import { turkeyCities } from '@/data/turkey-cities-districts';
+import { mockRoutes } from '@/data/mock-routes';
 import type { Route } from '@/types';
 
 export default function ExploreScreen() {
@@ -42,14 +43,29 @@ export default function ExploreScreen() {
   const loadRoutes = async () => {
     setLoading(true);
     try {
-      const filters = {
-        cityIds: selectedCityId ? [selectedCityId] : undefined,
-        minRating: minRating > 0 ? minRating : undefined,
-        sortBy,
-      };
+      // Mock data kullan ve filtrele
+      let filteredData = [...mockRoutes];
 
-      const data = await routesService.getAllRoutes(filters);
-      setRoutes(data);
+      // Şehir filtresi
+      if (selectedCityId) {
+        filteredData = filteredData.filter(route => route.cityId === selectedCityId);
+      }
+
+      // Puan filtresi
+      if (minRating > 0) {
+        filteredData = filteredData.filter(route => route.averageRating >= minRating);
+      }
+
+      // Sıralama
+      if (sortBy === 'rating') {
+        filteredData.sort((a, b) => b.averageRating - a.averageRating);
+      } else if (sortBy === 'popular') {
+        filteredData.sort((a, b) => b.viewCount - a.viewCount);
+      } else if (sortBy === 'newest') {
+        filteredData.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      }
+
+      setRoutes(filteredData);
     } catch (error) {
       console.error('loadRoutes error:', error);
     } finally {
