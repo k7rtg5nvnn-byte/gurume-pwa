@@ -19,7 +19,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { Picker } from '@react-navigation/elements';
+import { Picker } from '@react-native-picker/picker';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
