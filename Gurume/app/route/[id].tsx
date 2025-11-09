@@ -14,7 +14,7 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
-import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+// MapView removed - using Google Maps links instead
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -164,30 +164,20 @@ export default function RouteDetailScreen() {
           )}
         </View>
 
-        {/* Map Section */}
+        {/* Map Section - Google Maps Link */}
         <ThemedText type="subtitle" style={styles.sectionTitle}>
           Harita
         </ThemedText>
-        <View style={styles.mapContainer}>
-          <MapView
-            provider={PROVIDER_GOOGLE}
-            style={styles.map}
-            initialRegion={initialRegion}
-            showsUserLocation
-            showsMyLocationButton>
-            {route.stops?.map((stop, index) => (
-              <Marker
-                key={index}
-                coordinate={{
-                  latitude: stop.latitude || 41.0082,
-                  longitude: stop.longitude || 28.9784,
-                }}
-                title={`${index + 1}. Durak`}
-                description={stop.highlight}
-              />
-            ))}
-          </MapView>
-        </View>
+        <Pressable
+          style={[styles.mapsButton, { backgroundColor: Colors[colorScheme].primary }]}
+          onPress={() => {
+            const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(route.title)}`;
+            Linking.openURL(url);
+          }}>
+          <ThemedText style={styles.mapsButtonText} lightColor="#FFFFFF" darkColor="#1D1411">
+            🗺️ Google Maps'te Aç
+          </ThemedText>
+        </Pressable>
 
         {/* Stops Section */}
         <ThemedText type="subtitle" style={styles.sectionTitle}>
