@@ -21,6 +21,9 @@ import { Colors } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { turkeyCities } from '@/data/turkey-cities-districts';
+import { routesService } from '@/services/routes.service';
+import { imageUploadService } from '@/services/image-upload.service';
+import { placesService } from '@/services/places.service';
 
 export default function CreateRouteScreen() {
   const colorScheme = useColorScheme() ?? 'light';
@@ -42,6 +45,9 @@ export default function CreateRouteScreen() {
   const [stopHighlight, setStopHighlight] = useState('');
   const [stopNotes, setStopNotes] = useState('');
   const [stopDuration, setStopDuration] = useState('30');
+  const [placeSearch, setPlaceSearch] = useState('');
+  const [placeResults, setPlaceResults] = useState<any[]>([]);
+  const [searchingPlaces, setSearchingPlaces] = useState(false);
 
   const [coverImage, setCoverImage] = useState('');
   const [additionalImages, setAdditionalImages] = useState<string[]>([]);
@@ -92,22 +98,113 @@ export default function CreateRouteScreen() {
     setStops(reordered);
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!coverImage) {
       Alert.alert('Kapak Görseli', 'Lütfen bir kapak görseli ekleyin.');
       return;
     }
 
-    Alert.alert(
-      'Başarılı!',
-      'Rotanız oluşturuldu. Test modunda çalışıyor.',
-      [{ text: 'Tamam', onPress: () => router.push('/(tabs)/profile') }]
-    );
+    if (!user) {
+      Alert.alert('Hata', 'Giriş yapmanız gerekiyor.');
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      const routeInput = {
+        cityId,
+        districtIds: [],
+        title,
+        description,
+        coverImage,
+        images: additionalImages,
+        durationMinutes: parseInt(durationMinutes) || 120,
+        distanceKm: parseFloat(distanceKm) || 5,
+        tags: tags.split(',').map(t => t.trim()).filter(Boolean),
+        difficulty: 'easy' as const,
+        budgetRange: 'moderate' as const,
+        stops: stops.map((stop, idx) => ({
+          placeId: null, // Şimdilik null, Google Maps entegrasyonu sonrası eklenecek
+          order: idx + 1,
+          tastingNotes: [],
+          highlight: stop.highlight,
+          dwellMinutes: stop.duration,
+          arrivalTime: null,
+          transportMode: 'walking' as const,
+          notes: stop.notes || '',
+        })),
+      };
+
+      const response = await routesService.createRoute(routeInput, user.id);
+
+      if (response.success) {
+        Alert.alert(
+          'Başarılı!',
+          'Rotanız oluşturuldu ve moderasyon için gönderildi.',
+          [{ text: 'Tamam', onPress: () => router.push('/(tabs)/profile') }]
+        );
+      } else {
+        Alert.alert('Hata', response.error?.message || 'Rota oluşturulamadı.');
+      }
+    } catch (error) {
+      console.error('Submit error:', error);
+      Alert.alert('Hata', 'Bir sorun oluştu.');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleUploadCover = () => {
-    setCoverImage('https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=800');
-    Alert.alert('Başarılı', 'Görsel yüklendi (test modu)');
+  const handleUploadCover = async () => {
+    if (!user) {
+      Alert.alert('Hata', 'Giriş yapmanız gerekiyor.');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const result = await imageUploadService.uploadRouteCoverImage(user.id);
+      
+      if (result.success && result.url) {
+        setCoverImage(result.url);
+        Alert.alert('Başarılı', 'Görsel yüklendi!');
+      } else {
+        Alert.alert('Hata', result.error || 'Görsel yüklenemedi.');
+      }
+    } catch (error) {
+      console.error('Upload cover error:', error);
+      Alert.alert('Hata', 'Görsel yüklenirken bir sorun oluştu.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSearchPlaces = async (query: string) => {
+    setPlaceSearch(query);
+    
+    if (query.length < 2) {
+      setPlaceResults([]);
+      return;
+    }
+
+    try {
+      setSearchingPlaces(true);
+      const results = await placesService.searchPlaces({
+        query: selectedCity ? `${query} ${selectedCity.name}` : query,
+      });
+      setPlaceResults(results);
+    } catch (error) {
+      console.error('Search places error:', error);
+    } finally {
+      setSearchingPlaces(false);
+    }
+  };
+
+  const handleSelectPlace = (place: any) => {
+    setStopHighlight(place.name);
+    setStopNotes(`${place.address}${place.rating ? ` • ⭐ ${place.rating}` : ''}`);
+    setPlaceSearch('');
+    setPlaceResults([]);
   };
 
   if (!user) {
@@ -316,6 +413,51 @@ export default function CreateRouteScreen() {
                 ))}
               </View>
             )}
+
+            <View style={styles.inputGroup}>
+              <ThemedText style={styles.label}>🗺️ Mekan Ara (Google Maps)</ThemedText>
+              <TextInput
+                style={[
+                  styles.input,
+                  {
+                    borderColor: Colors[colorScheme].border,
+                    backgroundColor: Colors[colorScheme].cardBackground,
+                    color: Colors[colorScheme].text,
+                  },
+                ]}
+                placeholder="Örn: Karadeniz Döner"
+                placeholderTextColor={Colors[colorScheme].textLight}
+                value={placeSearch}
+                onChangeText={handleSearchPlaces}
+              />
+              {searchingPlaces && (
+                <View style={styles.searchingIndicator}>
+                  <ActivityIndicator size="small" color={Colors[colorScheme].primary} />
+                  <ThemedText style={styles.searchingText}>Aranıyor...</ThemedText>
+                </View>
+              )}
+              {placeResults.length > 0 && (
+                <ScrollView style={styles.placeResults} nestedScrollEnabled>
+                  {placeResults.map((place, idx) => (
+                    <Pressable
+                      key={idx}
+                      style={[
+                        styles.placeResultItem,
+                        { borderBottomColor: Colors[colorScheme].border }
+                      ]}
+                      onPress={() => handleSelectPlace(place)}>
+                      <ThemedText style={styles.placeName}>{place.name}</ThemedText>
+                      <ThemedText style={styles.placeAddress} numberOfLines={1}>
+                        📍 {place.address}
+                      </ThemedText>
+                      {place.rating && (
+                        <ThemedText style={styles.placeRating}>⭐ {place.rating}</ThemedText>
+                      )}
+                    </Pressable>
+                  ))}
+                </ScrollView>
+              )}
+            </View>
 
             <View style={styles.inputGroup}>
               <ThemedText style={styles.label}>Durak Açıklaması</ThemedText>
@@ -647,5 +789,38 @@ const styles = StyleSheet.create({
   buttonText: {
     fontWeight: '700',
     fontSize: 16,
+  },
+  searchingIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    gap: 8,
+  },
+  searchingText: {
+    fontSize: 14,
+  },
+  placeResults: {
+    maxHeight: 200,
+    borderWidth: 1,
+    borderColor: '#E5E5EA',
+    borderRadius: 12,
+    marginTop: 8,
+  },
+  placeResultItem: {
+    padding: 12,
+    borderBottomWidth: 1,
+    gap: 4,
+  },
+  placeName: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  placeAddress: {
+    fontSize: 13,
+    opacity: 0.7,
+  },
+  placeRating: {
+    fontSize: 12,
+    opacity: 0.8,
   },
 });

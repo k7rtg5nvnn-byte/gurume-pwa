@@ -10,6 +10,7 @@
 
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
+import { Platform } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import type { UploadImageResult } from '@/types';
 
@@ -121,15 +122,56 @@ class ImageUploadService {
     try {
       const { bucket, userId, maxSizeMB = 5, quality = 0.8 } = options;
 
-      // TEST MODE: Web için mock URL döndür
-      if (!FileSystem.EncodingType || !FileSystem.EncodingType.Base64) {
-        console.log('📷 TEST MODE: Image upload simulated');
-        return {
-          success: true,
-          url: `https://images.unsplash.com/photo-${Date.now()}?w=800`,
-        };
+      // WEB PLATFORMU: fetch ile yükle
+      if (Platform.OS === 'web') {
+        try {
+          const response = await fetch(imageAsset.uri);
+          const blob = await response.blob();
+
+          // Dosya boyutu kontrolü
+          if (blob.size > maxSizeMB * 1024 * 1024) {
+            return {
+              success: false,
+              error: `Dosya boyutu ${maxSizeMB}MB'dan küçük olmalıdır.`,
+            };
+          }
+
+          const fileExt = blob.type.split('/')[1] || 'jpg';
+          const fileName = `${userId}_${Date.now()}.${fileExt}`;
+          const filePath = `${userId}/${fileName}`;
+
+          const { data, error } = await supabase.storage
+            .from(bucket)
+            .upload(filePath, blob, {
+              contentType: blob.type,
+              cacheControl: '3600',
+              upsert: false,
+            });
+
+          if (error) {
+            console.error('Upload error (web):', error);
+            return {
+              success: false,
+              error: 'Resim yüklenemedi.',
+            };
+          }
+
+          const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(data.path);
+
+          return {
+            success: true,
+            url: urlData.publicUrl,
+          };
+        } catch (webError) {
+          console.error('Web upload error:', webError);
+          return {
+            success: false,
+            error: 'Web platformunda görsel yüklenemedi.',
+          };
+        }
       }
 
+      // MOBİL PLATFORMLAR: Base64 ile yükle
       // Dosya boyutu kontrolü
       if (imageAsset.fileSize && imageAsset.fileSize > maxSizeMB * 1024 * 1024) {
         return {
@@ -158,7 +200,7 @@ class ImageUploadService {
         });
 
       if (error) {
-        console.error('Upload error:', error);
+        console.error('Upload error (mobile):', error);
         return {
           success: false,
           error: 'Resim yüklenemedi.',

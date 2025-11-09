@@ -21,6 +21,7 @@ import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { turkeyCities } from '@/data/turkey-cities-districts';
 import { mockRoutes } from '@/data/mock-routes';
+import { routesService } from '@/services/routes.service';
 import type { Route } from '@/types';
 
 export default function ExploreScreen() {
@@ -39,29 +40,50 @@ export default function ExploreScreen() {
     loadRoutes();
   }, [selectedCityId, minRating, sortBy]);
 
-  const loadRoutes = () => {
+  const loadRoutes = async () => {
     setLoading(true);
     
-    let filteredData = [...mockRoutes];
+    try {
+      // Önce Supabase'den çek
+      const filters = {
+        cityIds: selectedCityId ? [selectedCityId] : undefined,
+        minRating: minRating || undefined,
+        sortBy: sortBy,
+      };
+      
+      const supabaseRoutes = await routesService.getAllRoutes(filters);
+      
+      if (supabaseRoutes && supabaseRoutes.length > 0) {
+        setRoutes(supabaseRoutes);
+      } else {
+        // Fallback: Mock data kullan
+        let filteredData = [...mockRoutes];
 
-    if (selectedCityId) {
-      filteredData = filteredData.filter(route => route.cityId === selectedCityId);
+        if (selectedCityId) {
+          filteredData = filteredData.filter(route => route.cityId === selectedCityId);
+        }
+
+        if (minRating > 0) {
+          filteredData = filteredData.filter(route => route.averageRating >= minRating);
+        }
+
+        if (sortBy === 'rating') {
+          filteredData.sort((a, b) => b.averageRating - a.averageRating);
+        } else if (sortBy === 'popular') {
+          filteredData.sort((a, b) => b.viewCount - a.viewCount);
+        } else if (sortBy === 'newest') {
+          filteredData.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        }
+
+        setRoutes(filteredData);
+      }
+    } catch (error) {
+      console.error('loadRoutes error:', error);
+      // Hata durumunda mock data kullan
+      setRoutes(mockRoutes);
+    } finally {
+      setLoading(false);
     }
-
-    if (minRating > 0) {
-      filteredData = filteredData.filter(route => route.averageRating >= minRating);
-    }
-
-    if (sortBy === 'rating') {
-      filteredData.sort((a, b) => b.averageRating - a.averageRating);
-    } else if (sortBy === 'popular') {
-      filteredData.sort((a, b) => b.viewCount - a.viewCount);
-    } else if (sortBy === 'newest') {
-      filteredData.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-    }
-
-    setRoutes(filteredData);
-    setLoading(false);
   };
 
   const filteredRoutes = routes.filter((route) => {
