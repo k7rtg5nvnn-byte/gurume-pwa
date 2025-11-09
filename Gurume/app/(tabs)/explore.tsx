@@ -1,5 +1,5 @@
 /**
- * KEŞFETİNDEN EKRANI
+ * KEŞFETİN EKRANI
  * 
  * - Gelişmiş arama
  * - Şehir filtreleme
@@ -12,7 +12,6 @@ import React, { useEffect, useState } from 'react';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
-import { Picker } from '@react-native-picker/picker';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -95,61 +94,78 @@ export default function ExploreScreen() {
       <ThemedView style={styles.filtersSection}>
         <ThemedText style={styles.filtersTitle}>Filtrele</ThemedText>
 
-        <View style={styles.filterRow}>
-          <View style={[styles.filterItem, { flex: 2 }]}>
-            <ThemedText style={styles.filterLabel}>Şehir</ThemedText>
-            <View
-              style={[
-                styles.pickerContainer,
-                {
-                  borderColor: Colors[colorScheme].border,
-                  backgroundColor: Colors[colorScheme].cardBackground,
-                },
-              ]}>
-              <Picker
-                selectedValue={selectedCityId}
-                onValueChange={setSelectedCityId}
-                style={{ color: Colors[colorScheme].text }}>
-                <Picker.Item label="Tüm Şehirler" value="" />
-                {turkeyCities.map((city) => (
-                  <Picker.Item key={city.id} label={city.name} value={city.id} />
-                ))}
-              </Picker>
+        {/* City Filter - Basit Butonlar */}
+        <View style={styles.filterItem}>
+          <ThemedText style={styles.filterLabel}>Şehir</ThemedText>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <View style={styles.cityButtons}>
+              <Pressable
+                style={[
+                  styles.cityButton,
+                  !selectedCityId && { backgroundColor: Colors[colorScheme].primary },
+                  { borderColor: Colors[colorScheme].border },
+                ]}
+                onPress={() => setSelectedCityId('')}>
+                <ThemedText
+                  style={styles.cityButtonText}
+                  lightColor={!selectedCityId ? '#FFFFFF' : Colors.light.text}
+                  darkColor={!selectedCityId ? '#1D1411' : Colors.dark.text}>
+                  Tümü
+                </ThemedText>
+              </Pressable>
+              {turkeyCities.slice(0, 10).map((city) => (
+                <Pressable
+                  key={city.id}
+                  style={[
+                    styles.cityButton,
+                    selectedCityId === city.id && { backgroundColor: Colors[colorScheme].primary },
+                    { borderColor: Colors[colorScheme].border },
+                  ]}
+                  onPress={() => setSelectedCityId(city.id)}>
+                  <ThemedText
+                    style={styles.cityButtonText}
+                    lightColor={selectedCityId === city.id ? '#FFFFFF' : Colors.light.text}
+                    darkColor={selectedCityId === city.id ? '#1D1411' : Colors.dark.text}>
+                    {city.name}
+                  </ThemedText>
+                </Pressable>
+              ))}
             </View>
-          </View>
+          </ScrollView>
+        </View>
 
-          <View style={[styles.filterItem, { flex: 1 }]}>
-            <ThemedText style={styles.filterLabel}>Min Puan</ThemedText>
-            <View
-              style={[
-                styles.pickerContainer,
-                {
-                  borderColor: Colors[colorScheme].border,
-                  backgroundColor: Colors[colorScheme].cardBackground,
-                },
-              ]}>
-              <Picker
-                selectedValue={minRating}
-                onValueChange={(value) => setMinRating(value)}
-                style={{ color: Colors[colorScheme].text }}>
-                <Picker.Item label="Tümü" value={0} />
-                <Picker.Item label="3+" value={3} />
-                <Picker.Item label="4+" value={4} />
-                <Picker.Item label="4.5+" value={4.5} />
-              </Picker>
-            </View>
+        {/* Rating Filter */}
+        <View style={styles.filterItem}>
+          <ThemedText style={styles.filterLabel}>Min Puan</ThemedText>
+          <View style={styles.ratingButtons}>
+            {[0, 3, 4, 4.5].map((rating) => (
+              <Pressable
+                key={rating}
+                style={[
+                  styles.ratingButton,
+                  minRating === rating && { backgroundColor: Colors[colorScheme].primary },
+                  { borderColor: Colors[colorScheme].border },
+                ]}
+                onPress={() => setMinRating(rating)}>
+                <ThemedText
+                  style={styles.ratingButtonText}
+                  lightColor={minRating === rating ? '#FFFFFF' : Colors.light.text}
+                  darkColor={minRating === rating ? '#1D1411' : Colors.dark.text}>
+                  {rating === 0 ? 'Tümü' : `${rating}+`}
+                </ThemedText>
+              </Pressable>
+            ))}
           </View>
         </View>
 
+        {/* Sort */}
         <View style={styles.filterItem}>
           <ThemedText style={styles.filterLabel}>Sıralama</ThemedText>
           <View style={styles.sortButtons}>
             <Pressable
               style={[
                 styles.sortButton,
-                sortBy === 'rating' && {
-                  backgroundColor: Colors[colorScheme].primary,
-                },
+                sortBy === 'rating' && { backgroundColor: Colors[colorScheme].primary },
                 { borderColor: Colors[colorScheme].border },
               ]}
               onPress={() => setSortBy('rating')}>
@@ -164,9 +180,7 @@ export default function ExploreScreen() {
             <Pressable
               style={[
                 styles.sortButton,
-                sortBy === 'popular' && {
-                  backgroundColor: Colors[colorScheme].primary,
-                },
+                sortBy === 'popular' && { backgroundColor: Colors[colorScheme].primary },
                 { borderColor: Colors[colorScheme].border },
               ]}
               onPress={() => setSortBy('popular')}>
@@ -181,9 +195,7 @@ export default function ExploreScreen() {
             <Pressable
               style={[
                 styles.sortButton,
-                sortBy === 'newest' && {
-                  backgroundColor: Colors[colorScheme].primary,
-                },
+                sortBy === 'newest' && { backgroundColor: Colors[colorScheme].primary },
                 { borderColor: Colors[colorScheme].border },
               ]}
               onPress={() => setSortBy('newest')}>
@@ -332,10 +344,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
   },
-  filterRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
   filterItem: {
     gap: 8,
   },
@@ -343,10 +351,34 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
-  pickerContainer: {
+  cityButtons: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  cityButton: {
     borderWidth: 1,
     borderRadius: 12,
-    overflow: 'hidden',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  cityButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  ratingButtons: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  ratingButton: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  ratingButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
   sortButtons: {
     flexDirection: 'row',

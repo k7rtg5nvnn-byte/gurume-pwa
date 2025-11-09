@@ -2,7 +2,7 @@
  * ROTA OLUŞTURMA EKRANI
  * 
  * 3 Aşamalı Form:
- * 1. Temel Bilgiler + Şehir/İlçe Seçimi
+ * 1. Temel Bilgiler + Şehir Seçimi
  * 2. Duraklar & Mekanlar
  * 3. Görsel Yükleme & Yayınlama
  */
@@ -19,7 +19,6 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { Picker } from '@react-native-picker/picker';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -38,6 +37,7 @@ export default function CreateRouteScreen() {
 
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [showCityPicker, setShowCityPicker] = useState(false);
 
   // Step 1: Temel Bilgiler
   const [title, setTitle] = useState('');
@@ -59,6 +59,8 @@ export default function CreateRouteScreen() {
   // Step 3: Görseller
   const [coverImage, setCoverImage] = useState('');
   const [additionalImages, setAdditionalImages] = useState<string[]>([]);
+
+  const selectedCity = turkeyCities.find(c => c.id === cityId);
 
   const handleNext = () => {
     if (step === 1) {
@@ -88,7 +90,7 @@ export default function CreateRouteScreen() {
 
     const newStop: RouteStop = {
       order: stops.length + 1,
-      placeId: '', // Placeholder - gerçek uygulamada place picker olacak
+      placeId: '',
       tastingNotes: stopNotes ? [stopNotes] : [],
       highlight: stopHighlight,
       dwellMinutes: parseInt(stopDuration) || 30,
@@ -102,7 +104,6 @@ export default function CreateRouteScreen() {
 
   const handleRemoveStop = (index: number) => {
     const newStops = stops.filter((_, i) => i !== index);
-    // Sıraları yeniden düzenle
     const reorderedStops = newStops.map((stop, i) => ({ ...stop, order: i + 1 }));
     setStops(reorderedStops);
   };
@@ -245,30 +246,42 @@ export default function CreateRouteScreen() {
               colorScheme={colorScheme}
             />
 
+            {/* Şehir Seçimi - Buton */}
             <View style={styles.inputGroup}>
               <ThemedText style={styles.label}>Şehir *</ThemedText>
-              <View
+              <Pressable
                 style={[
-                  styles.pickerContainer,
-                  {
-                    borderColor: Colors[colorScheme].border,
-                    backgroundColor: Colors[colorScheme].cardBackground,
-                  },
-                ]}>
-                <Picker
-                  selectedValue={cityId}
-                  onValueChange={(value) => {
-                    setCityId(value);
-                    setDistrictIds([]);
-                  }}
-                  style={{ color: Colors[colorScheme].text }}>
-                  <Picker.Item label="Şehir seçin..." value="" />
-                  {turkeyCities.map((city) => (
-                    <Picker.Item key={city.id} label={city.name} value={city.id} />
-                  ))}
-                </Picker>
-              </View>
+                  styles.cityPickerButton,
+                  { borderColor: Colors[colorScheme].border, backgroundColor: Colors[colorScheme].cardBackground }
+                ]}
+                onPress={() => setShowCityPicker(!showCityPicker)}>
+                <ThemedText style={selectedCity ? styles.citySelectedText : styles.cityPlaceholderText}>
+                  {selectedCity ? selectedCity.name : 'Şehir seçin...'}
+                </ThemedText>
+                <ThemedText style={styles.chevron}>{showCityPicker ? '▲' : '▼'}</ThemedText>
+              </Pressable>
             </View>
+
+            {/* Şehir Listesi */}
+            {showCityPicker && (
+              <ScrollView style={styles.cityList} nestedScrollEnabled>
+                {turkeyCities.map((city) => (
+                  <Pressable
+                    key={city.id}
+                    style={[
+                      styles.cityListItem,
+                      cityId === city.id && { backgroundColor: Colors[colorScheme].badgeOrange },
+                      { borderBottomColor: Colors[colorScheme].border }
+                    ]}
+                    onPress={() => {
+                      setCityId(city.id);
+                      setShowCityPicker(false);
+                    }}>
+                    <ThemedText style={styles.cityListItemText}>{city.name}</ThemedText>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            )}
 
             <View style={styles.row}>
               <View style={[styles.inputGroup, { flex: 1 }]}>
@@ -283,6 +296,7 @@ export default function CreateRouteScreen() {
                     },
                   ]}
                   placeholder="120"
+                  placeholderTextColor={Colors[colorScheme].textLight}
                   value={durationMinutes}
                   onChangeText={setDurationMinutes}
                   keyboardType="numeric"
@@ -301,6 +315,7 @@ export default function CreateRouteScreen() {
                     },
                   ]}
                   placeholder="5"
+                  placeholderTextColor={Colors[colorScheme].textLight}
                   value={distanceKm}
                   onChangeText={setDistanceKm}
                   keyboardType="decimal-pad"
@@ -586,10 +601,39 @@ const styles = StyleSheet.create({
     minHeight: 100,
     textAlignVertical: 'top',
   },
-  pickerContainer: {
+  cityPickerButton: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  cityPlaceholderText: {
+    fontSize: 16,
+    opacity: 0.5,
+  },
+  citySelectedText: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  chevron: {
+    fontSize: 12,
+  },
+  cityList: {
+    maxHeight: 200,
     borderWidth: 1,
     borderRadius: 12,
     overflow: 'hidden',
+  },
+  cityListItem: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+  },
+  cityListItemText: {
+    fontSize: 15,
   },
   row: {
     flexDirection: 'row',
