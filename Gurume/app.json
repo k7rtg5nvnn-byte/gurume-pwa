@@ -23,7 +23,11 @@
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "Gurume rotalarınıza fotoğraf eklemek için galeri erişimi gereklidir.",
         "NSCameraUsageDescription": "Gurume rotalarınıza fotoğraf çekmek için kamera erişimi gereklidir.",
-        "NSPhotoLibraryAddUsageDescription": "Gurume fotoğraflarınızı galerinize kaydetmek için izin gereklidir."
+        "NSPhotoLibraryAddUsageDescription": "Gurume fotoğraflarınızı galerinize kaydetmek için izin gereklidir.",
+        "NSLocationWhenInUseUsageDescription": "Gurume yakınınızdaki lezzet rotalarını göstermek için konum bilginize ihtiyaç duyar."
+      },
+      "config": {
+        "googleMapsApiKey": "YOUR_IOS_GOOGLE_MAPS_API_KEY"
       }
     },
     "android": {
@@ -43,6 +47,11 @@
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.ACCESS_COARSE_LOCATION"
       ],
+      "config": {
+        "googleMaps": {
+          "apiKey": "YOUR_ANDROID_GOOGLE_MAPS_API_KEY"
+        }
+      },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },

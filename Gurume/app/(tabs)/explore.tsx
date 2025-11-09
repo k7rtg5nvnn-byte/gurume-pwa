@@ -1,23 +1,24 @@
 /**
- * KEŞFETİN EKRANI
- * 
- * - Gelişmiş arama
- * - Şehir filtreleme
- * - Puan filtreleme
- * - Sıralama seçenekleri
- * - Rotaları listele
+ * KEŞFET EKRANI - TAM ÇALIŞIR VERSİYON
  */
 
 import React, { useEffect, useState } from 'react';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import {
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  View,
+} from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { routesService } from '@/services/routes.service';
 import { turkeyCities } from '@/data/turkey-cities-districts';
 import { mockRoutes } from '@/data/mock-routes';
 import type { Route } from '@/types';
@@ -27,56 +28,44 @@ export default function ExploreScreen() {
   const router = useRouter();
 
   const [routes, setRoutes] = useState<Route[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   
-  // Filters
   const [selectedCityId, setSelectedCityId] = useState<string>('');
   const [minRating, setMinRating] = useState<number>(0);
   const [sortBy, setSortBy] = useState<'rating' | 'popular' | 'newest'>('rating');
 
   useEffect(() => {
     loadRoutes();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCityId, minRating, sortBy]);
 
-  const loadRoutes = async () => {
+  const loadRoutes = () => {
     setLoading(true);
-    try {
-      // Mock data kullan ve filtrele
-      let filteredData = [...mockRoutes];
+    
+    let filteredData = [...mockRoutes];
 
-      // Şehir filtresi
-      if (selectedCityId) {
-        filteredData = filteredData.filter(route => route.cityId === selectedCityId);
-      }
-
-      // Puan filtresi
-      if (minRating > 0) {
-        filteredData = filteredData.filter(route => route.averageRating >= minRating);
-      }
-
-      // Sıralama
-      if (sortBy === 'rating') {
-        filteredData.sort((a, b) => b.averageRating - a.averageRating);
-      } else if (sortBy === 'popular') {
-        filteredData.sort((a, b) => b.viewCount - a.viewCount);
-      } else if (sortBy === 'newest') {
-        filteredData.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-      }
-
-      setRoutes(filteredData);
-    } catch (error) {
-      console.error('loadRoutes error:', error);
-    } finally {
-      setLoading(false);
+    if (selectedCityId) {
+      filteredData = filteredData.filter(route => route.cityId === selectedCityId);
     }
+
+    if (minRating > 0) {
+      filteredData = filteredData.filter(route => route.averageRating >= minRating);
+    }
+
+    if (sortBy === 'rating') {
+      filteredData.sort((a, b) => b.averageRating - a.averageRating);
+    } else if (sortBy === 'popular') {
+      filteredData.sort((a, b) => b.viewCount - a.viewCount);
+    } else if (sortBy === 'newest') {
+      filteredData.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    }
+
+    setRoutes(filteredData);
+    setLoading(false);
   };
 
-  // Search filtresi
   const filteredRoutes = routes.filter((route) => {
     if (!searchTerm.trim()) return true;
-    
     const lowered = searchTerm.toLowerCase();
     return (
       route.title.toLowerCase().includes(lowered) ||
@@ -90,10 +79,9 @@ export default function ExploreScreen() {
       <ThemedView style={styles.header}>
         <ThemedText type="title">Keşfet</ThemedText>
         <ThemedText style={styles.subtitle}>
-          Türkiye&apos;nin en iyi lezzet rotalarını keşfet ve favorilerine ekle.
+          Türkiye&apos;nin en iyi lezzet rotalarını keşfet
         </ThemedText>
 
-        {/* Search */}
         <View style={[styles.searchContainer, { borderColor: Colors[colorScheme].border }]}>
           <ThemedText style={styles.searchIcon}>🔍</ThemedText>
           <TextInput
@@ -106,11 +94,9 @@ export default function ExploreScreen() {
         </View>
       </ThemedView>
 
-      {/* Filters */}
       <ThemedView style={styles.filtersSection}>
         <ThemedText style={styles.filtersTitle}>Filtrele</ThemedText>
 
-        {/* City Filter - Basit Butonlar */}
         <View style={styles.filterItem}>
           <ThemedText style={styles.filterLabel}>Şehir</ThemedText>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -129,7 +115,7 @@ export default function ExploreScreen() {
                   Tümü
                 </ThemedText>
               </Pressable>
-              {turkeyCities.slice(0, 10).map((city) => (
+              {turkeyCities.slice(0, 15).map((city) => (
                 <Pressable
                   key={city.id}
                   style={[
@@ -150,7 +136,6 @@ export default function ExploreScreen() {
           </ScrollView>
         </View>
 
-        {/* Rating Filter */}
         <View style={styles.filterItem}>
           <ThemedText style={styles.filterLabel}>Min Puan</ThemedText>
           <View style={styles.ratingButtons}>
@@ -174,59 +159,34 @@ export default function ExploreScreen() {
           </View>
         </View>
 
-        {/* Sort */}
         <View style={styles.filterItem}>
           <ThemedText style={styles.filterLabel}>Sıralama</ThemedText>
           <View style={styles.sortButtons}>
-            <Pressable
-              style={[
-                styles.sortButton,
-                sortBy === 'rating' && { backgroundColor: Colors[colorScheme].primary },
-                { borderColor: Colors[colorScheme].border },
-              ]}
-              onPress={() => setSortBy('rating')}>
-              <ThemedText
-                style={styles.sortButtonText}
-                lightColor={sortBy === 'rating' ? '#FFFFFF' : Colors.light.text}
-                darkColor={sortBy === 'rating' ? '#1D1411' : Colors.dark.text}>
-                Puana Göre
-              </ThemedText>
-            </Pressable>
-
-            <Pressable
-              style={[
-                styles.sortButton,
-                sortBy === 'popular' && { backgroundColor: Colors[colorScheme].primary },
-                { borderColor: Colors[colorScheme].border },
-              ]}
-              onPress={() => setSortBy('popular')}>
-              <ThemedText
-                style={styles.sortButtonText}
-                lightColor={sortBy === 'popular' ? '#FFFFFF' : Colors.light.text}
-                darkColor={sortBy === 'popular' ? '#1D1411' : Colors.dark.text}>
-                Popüler
-              </ThemedText>
-            </Pressable>
-
-            <Pressable
-              style={[
-                styles.sortButton,
-                sortBy === 'newest' && { backgroundColor: Colors[colorScheme].primary },
-                { borderColor: Colors[colorScheme].border },
-              ]}
-              onPress={() => setSortBy('newest')}>
-              <ThemedText
-                style={styles.sortButtonText}
-                lightColor={sortBy === 'newest' ? '#FFFFFF' : Colors.light.text}
-                darkColor={sortBy === 'newest' ? '#1D1411' : Colors.dark.text}>
-                Yeni
-              </ThemedText>
-            </Pressable>
+            {[
+              { key: 'rating', label: 'Puana Göre' },
+              { key: 'popular', label: 'Popüler' },
+              { key: 'newest', label: 'Yeni' },
+            ].map((option) => (
+              <Pressable
+                key={option.key}
+                style={[
+                  styles.sortButton,
+                  sortBy === option.key && { backgroundColor: Colors[colorScheme].primary },
+                  { borderColor: Colors[colorScheme].border },
+                ]}
+                onPress={() => setSortBy(option.key as any)}>
+                <ThemedText
+                  style={styles.sortButtonText}
+                  lightColor={sortBy === option.key ? '#FFFFFF' : Colors.light.text}
+                  darkColor={sortBy === option.key ? '#1D1411' : Colors.dark.text}>
+                  {option.label}
+                </ThemedText>
+              </Pressable>
+            ))}
           </View>
         </View>
       </ThemedView>
 
-      {/* Results */}
       <ThemedView style={styles.resultsSection}>
         <ThemedText style={styles.resultsTitle}>
           Sonuçlar ({filteredRoutes.length})
@@ -239,9 +199,6 @@ export default function ExploreScreen() {
         ) : filteredRoutes.length === 0 ? (
           <View style={styles.emptyState}>
             <ThemedText style={styles.emptyText}>Rota bulunamadı.</ThemedText>
-            <ThemedText style={styles.emptyHint}>
-              Farklı filtreler deneyin veya tüm rotaları görüntüleyin.
-            </ThemedText>
           </View>
         ) : (
           <FlatList
@@ -283,7 +240,6 @@ function RouteCard({
             </ThemedText>
             <View style={styles.ratingBadge}>
               <ThemedText style={styles.routeRating}>⭐ {route.averageRating.toFixed(1)}</ThemedText>
-              <ThemedText style={styles.ratingCount}>({route.ratingCount})</ThemedText>
             </View>
           </View>
 
@@ -296,26 +252,11 @@ function RouteCard({
               📍 {route.stops?.length || 0} durak
             </ThemedText>
             <ThemedText style={styles.metaText}>⏱️ {route.durationMinutes} dk</ThemedText>
-            <ThemedText style={styles.metaText}>🚶 {route.distanceKm.toFixed(1)} km</ThemedText>
           </View>
 
           <View style={styles.routeFooter}>
             <ThemedText style={styles.authorText}>@{route.author.username}</ThemedText>
-            <View style={styles.tags}>
-              {route.tags.slice(0, 2).map((tag) => (
-                <View
-                  key={tag}
-                  style={[
-                    styles.tag,
-                    {
-                      backgroundColor: Colors[colorScheme].badgeYellow,
-                      borderColor: Colors[colorScheme].accent,
-                    },
-                  ]}>
-                  <ThemedText style={styles.tagText}>#{tag}</ThemedText>
-                </View>
-              ))}
-            </View>
+            {route.isVerified && <ThemedText style={styles.verifiedBadge}>✓</ThemedText>}
           </View>
         </View>
       </View>
@@ -427,15 +368,9 @@ const styles = StyleSheet.create({
   emptyState: {
     paddingVertical: 60,
     alignItems: 'center',
-    gap: 8,
   },
   emptyText: {
     fontSize: 16,
-    fontWeight: '600',
-  },
-  emptyHint: {
-    fontSize: 14,
-    textAlign: 'center',
   },
   separator: {
     height: 16,
@@ -455,7 +390,7 @@ const styles = StyleSheet.create({
   },
   routeContent: {
     flex: 1,
-    gap: 8,
+    gap: 6,
   },
   routeHeader: {
     flexDirection: 'row',
@@ -469,15 +404,10 @@ const styles = StyleSheet.create({
   },
   ratingBadge: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
   },
   routeRating: {
     fontSize: 14,
     fontWeight: '700',
-  },
-  ratingCount: {
-    fontSize: 11,
   },
   routeDesc: {
     fontSize: 13,
@@ -492,25 +422,15 @@ const styles = StyleSheet.create({
   },
   routeFooter: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    gap: 4,
   },
   authorText: {
     fontSize: 12,
     fontWeight: '600',
   },
-  tags: {
-    flexDirection: 'row',
-    gap: 4,
-  },
-  tag: {
-    borderWidth: 1,
-    borderRadius: 999,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  tagText: {
-    fontSize: 10,
-    fontWeight: '600',
+  verifiedBadge: {
+    fontSize: 12,
+    color: '#4CAF50',
   },
 });

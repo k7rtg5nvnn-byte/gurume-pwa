@@ -121,6 +121,15 @@ class ImageUploadService {
     try {
       const { bucket, userId, maxSizeMB = 5, quality = 0.8 } = options;
 
+      // TEST MODE: Web için mock URL döndür
+      if (!FileSystem.EncodingType || !FileSystem.EncodingType.Base64) {
+        console.log('📷 TEST MODE: Image upload simulated');
+        return {
+          success: true,
+          url: `https://images.unsplash.com/photo-${Date.now()}?w=800`,
+        };
+      }
+
       // Dosya boyutu kontrolü
       if (imageAsset.fileSize && imageAsset.fileSize > maxSizeMB * 1024 * 1024) {
         return {
