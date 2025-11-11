@@ -153,7 +153,7 @@ export default function RouteDetailScreen() {
             <View style={styles.authorDetails}>
               <ThemedText style={styles.authorName}>@{route.author.username}</ThemedText>
               <ThemedText style={styles.authorMeta}>
-                {route.author.totalRoutes} rota • {route.author.averageRouteRating.toFixed(1)}⭐
+                {route.author.totalRoutes} rota • {(route.author.averageRouteRating || 0).toFixed(1)}⭐
               </ThemedText>
             </View>
           </View>

@@ -19,6 +19,7 @@ export default function RootLayout() {
       <AuthProvider>
         <GurumeDataProvider>
           <Stack>
+            <Stack.Screen name="welcome/index" options={{ headerShown: false }} />
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             <Stack.Screen name="auth/login" options={{ headerShown: false }} />
             <Stack.Screen name="auth/register" options={{ headerShown: false }} />
