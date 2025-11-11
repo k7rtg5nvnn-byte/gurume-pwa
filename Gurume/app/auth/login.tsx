@@ -185,10 +185,10 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   subtitle: {
-    fontSize: 15,
+    fontSize: 14,
     textAlign: 'center',
-    lineHeight: 22,
-    maxWidth: '80%',
+    lineHeight: 20,
+    paddingHorizontal: 20,
   },
   form: {
     gap: 16,

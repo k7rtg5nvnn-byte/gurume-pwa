@@ -32,14 +32,16 @@ export default function HomeScreen() {
   const colorScheme = useColorScheme() ?? 'light';
 
   const [selectedCityId, setSelectedCityId] = useState<string>('');
+  const [selectedDistrictIds, setSelectedDistrictIds] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [routes, setRoutes] = useState<Route[]>([]);
   const [loading, setLoading] = useState(false);
   const [showCityPicker, setShowCityPicker] = useState(false);
+  const [showDistrictPicker, setShowDistrictPicker] = useState(false);
 
   useEffect(() => {
     loadRoutes();
-  }, [selectedCityId]);
+  }, [selectedCityId, selectedDistrictIds]);
 
   const loadRoutes = () => {
     setLoading(true);
@@ -48,6 +50,12 @@ export default function HomeScreen() {
     
     if (selectedCityId) {
       filteredRoutes = filteredRoutes.filter(r => r.cityId === selectedCityId);
+    }
+    
+    if (selectedDistrictIds.length > 0) {
+      filteredRoutes = filteredRoutes.filter(r => 
+        r.districtIds.some(id => selectedDistrictIds.includes(id))
+      );
     }
     
     // Puana göre sırala
@@ -115,6 +123,7 @@ export default function HomeScreen() {
                 style={[styles.cityItem, !selectedCityId && styles.cityItemActive]}
                 onPress={() => {
                   setSelectedCityId('');
+                  setSelectedDistrictIds([]);
                   setShowCityPicker(false);
                   setSearchQuery('');
                 }}>
@@ -131,6 +140,7 @@ export default function HomeScreen() {
                   ]}
                   onPress={() => {
                     setSelectedCityId(city.id);
+                    setSelectedDistrictIds([]);
                     setShowCityPicker(false);
                     setSearchQuery('');
                   }}>
@@ -139,6 +149,80 @@ export default function HomeScreen() {
                 </Pressable>
               ))}
             </ScrollView>
+          </View>
+        )}
+
+        {/* District Picker - Show only if city selected */}
+        {selectedCity && (
+          <View style={styles.field}>
+            <ThemedText style={styles.searchLabel}>🏘️ İlçe Seçin (Opsiyonel)</ThemedText>
+            <Pressable
+              style={[styles.cityPickerButton, { 
+                borderColor: Colors[colorScheme].border,
+                backgroundColor: Colors[colorScheme].cardBackground 
+              }]}
+              onPress={() => setShowDistrictPicker(!showDistrictPicker)}>
+              <ThemedText style={selectedDistrictIds.length > 0 ? styles.citySelectedText : styles.cityPlaceholderText}>
+                {selectedDistrictIds.length > 0 
+                  ? `${selectedDistrictIds.length} ilçe seçildi` 
+                  : 'Tüm İlçeler'}
+              </ThemedText>
+              <ThemedText style={styles.chevron}>{showDistrictPicker ? '▲' : '▼'}</ThemedText>
+            </Pressable>
+
+            {showDistrictPicker && (
+              <View style={[styles.cityDropdown, { 
+                borderColor: Colors[colorScheme].border,
+                backgroundColor: Colors[colorScheme].cardBackground 
+              }]}>
+                <ScrollView style={styles.cityList} nestedScrollEnabled>
+                  <Pressable
+                    style={[styles.cityItem, selectedDistrictIds.length === 0 && styles.cityItemActive]}
+                    onPress={() => {
+                      setSelectedDistrictIds([]);
+                      setShowDistrictPicker(false);
+                    }}>
+                    <ThemedText style={styles.cityItemText}>🌍 Tüm İlçeler</ThemedText>
+                  </Pressable>
+                  
+                  {selectedCity.districts.map((district) => {
+                    const isSelected = selectedDistrictIds.includes(district.id);
+                    return (
+                      <Pressable
+                        key={district.id}
+                        style={[
+                          styles.cityItem,
+                          isSelected && styles.cityItemActive,
+                          { borderBottomColor: Colors[colorScheme].border }
+                        ]}
+                        onPress={() => {
+                          if (isSelected) {
+                            setSelectedDistrictIds(selectedDistrictIds.filter(id => id !== district.id));
+                          } else {
+                            setSelectedDistrictIds([...selectedDistrictIds, district.id]);
+                          }
+                        }}>
+                        <ThemedText style={styles.cityItemText}>{district.name}</ThemedText>
+                        {isSelected && <ThemedText>✓</ThemedText>}
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            )}
+
+            {selectedDistrictIds.length > 0 && (
+              <View style={styles.selectedTags}>
+                {selectedCity.districts.filter(d => selectedDistrictIds.includes(d.id)).map((district) => (
+                  <View key={district.id} style={[styles.tag, { backgroundColor: Colors[colorScheme].badgeOrange }]}>
+                    <ThemedText style={styles.tagText}>{district.name}</ThemedText>
+                    <Pressable onPress={() => setSelectedDistrictIds(selectedDistrictIds.filter(id => id !== district.id))}>
+                      <ThemedText style={styles.tagClose}> ✕</ThemedText>
+                    </Pressable>
+                  </View>
+                ))}
+              </View>
+            )}
           </View>
         )}
       </View>
@@ -321,6 +405,33 @@ const styles = StyleSheet.create({
   },
   cityItemText: {
     fontSize: 16,
+  },
+  field: {
+    marginTop: 12,
+  },
+  selectedTags: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 12,
+  },
+  tag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  tagText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  tagClose: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    marginLeft: 4,
   },
   routesSection: {
     flex: 1,

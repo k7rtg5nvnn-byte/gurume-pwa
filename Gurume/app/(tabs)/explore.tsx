@@ -145,7 +145,7 @@ export default function ExploreScreen() {
                     selectedCityId === city.id && { backgroundColor: Colors[colorScheme].primary },
                     { borderColor: Colors[colorScheme].border },
                   ]}
-                  onPress={() => setSelectedCityId(city.id)}>
+                  onPress={() => setSelectedCityId(selectedCityId === city.id ? '' : city.id)}>
                   <ThemedText
                     style={styles.cityButtonText}
                     lightColor={selectedCityId === city.id ? '#FFFFFF' : Colors.light.text}
@@ -170,7 +170,7 @@ export default function ExploreScreen() {
                   minRating === rating && { backgroundColor: Colors[colorScheme].primary },
                   { borderColor: Colors[colorScheme].border },
                 ]}
-                onPress={() => setMinRating(rating)}>
+                onPress={() => setMinRating(minRating === rating && rating !== 0 ? 0 : rating)}>
                 <ThemedText
                   style={styles.ratingButtonText}
                   lightColor={minRating === rating ? '#FFFFFF' : Colors.light.text}
@@ -197,7 +197,7 @@ export default function ExploreScreen() {
                   sortBy === option.key && { backgroundColor: Colors[colorScheme].primary },
                   { borderColor: Colors[colorScheme].border },
                 ]}
-                onPress={() => setSortBy(option.key as any)}>
+                onPress={() => setSortBy(sortBy === option.key && option.key !== 'rating' ? 'rating' : option.key as any)}>
                 <ThemedText
                   style={styles.sortButtonText}
                   lightColor={sortBy === option.key ? '#FFFFFF' : Colors.light.text}
