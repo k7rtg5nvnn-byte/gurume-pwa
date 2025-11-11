@@ -1,23 +1,28 @@
 /**
- * ANA EKRAN
+ * ANA EKRAN - YENİDEN TASARIM
  * 
- * - Puana göre sıralı top rotalar
- * - Şehir bazlı rota önerileri
- * - Trending rotalar
- * - Auth kontrolü
+ * Üstte: İl arama/seçimi
+ * Altında: Seçilen ilin rotaları (puana göre sıralı)
  */
 
 import React, { useEffect, useState } from 'react';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, View, RefreshControl } from 'react-native';
+import {
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  View,
+} from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useAuth } from '@/contexts/AuthContext';
-import { routesService } from '@/services/routes.service';
 import { turkeyCities } from '@/data/turkey-cities-districts';
 import { mockRoutes } from '@/data/mock-routes';
 import type { Route } from '@/types';
@@ -25,547 +30,405 @@ import type { Route } from '@/types';
 export default function HomeScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme() ?? 'light';
-  const { user } = useAuth();
 
-  const [topRatedRoutes, setTopRatedRoutes] = useState<Route[]>([]);
-  const [trendingRoutes, setTrendingRoutes] = useState<Route[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-
-  // İlk top 3 şehir
-  const highlightedCities = turkeyCities.slice(0, 3);
+  const [selectedCityId, setSelectedCityId] = useState<string>('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [routes, setRoutes] = useState<Route[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [showCityPicker, setShowCityPicker] = useState(false);
 
   useEffect(() => {
     loadRoutes();
-  }, []);
+  }, [selectedCityId]);
 
-  const loadRoutes = async () => {
-    try {
-      // Mock data kullan (Supabase'de veri yoksa)
-      const sortedByRating = [...mockRoutes].sort((a, b) => b.averageRating - a.averageRating);
-      const sortedByPopular = [...mockRoutes].sort((a, b) => b.viewCount - a.viewCount);
-      
-      setTopRatedRoutes(sortedByRating.slice(0, 5));
-      setTrendingRoutes(sortedByPopular.slice(0, 5));
-    } catch (error) {
-      console.error('loadRoutes error:', error);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
+  const loadRoutes = () => {
+    setLoading(true);
+    
+    let filteredRoutes = [...mockRoutes];
+    
+    if (selectedCityId) {
+      filteredRoutes = filteredRoutes.filter(r => r.cityId === selectedCityId);
     }
+    
+    // Puana göre sırala
+    filteredRoutes.sort((a, b) => b.averageRating - a.averageRating);
+    
+    setRoutes(filteredRoutes);
+    setLoading(false);
   };
 
-  const onRefresh = () => {
-    setRefreshing(true);
-    loadRoutes();
-  };
+  const filteredCities = turkeyCities.filter(city =>
+    city.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
-  const handleAuthAction = () => {
-    if (!user) {
-      router.push('/auth/login');
-    } else {
-      router.push('/(tabs)/create');
-    }
-  };
-
-  if (loading) {
-    return (
-      <ThemedView style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={Colors[colorScheme].primary} />
-        <ThemedText style={{ marginTop: 16 }}>Rotalar yükleniyor...</ThemedText>
-      </ThemedView>
-    );
-  }
+  const selectedCity = turkeyCities.find(c => c.id === selectedCityId);
 
   return (
-    <ScrollView
-      contentContainerStyle={styles.container}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
-      {/* Hero Section */}
-      <ThemedView style={[styles.heroCard, { borderColor: Colors[colorScheme].border }]}>
-        <View style={styles.heroContent}>
-          <ThemedText type="title" style={styles.heroTitle}>
-            Gurume
+    <ThemedView style={styles.container}>
+      {/* Header with Gradient */}
+      <LinearGradient
+        colors={[Colors[colorScheme].primary, Colors[colorScheme].secondary]}
+        style={styles.header}>
+        <ThemedText type="title" style={styles.headerTitle} lightColor="#FFFFFF" darkColor="#FFFFFF">
+          Gurume
+        </ThemedText>
+        <ThemedText style={styles.headerSubtitle} lightColor="#FFFFFF" darkColor="#FFFFFF">
+          Türkiye'nin lezzet rotaları
+        </ThemedText>
+      </LinearGradient>
+
+      {/* City Search/Picker */}
+      <View style={styles.searchSection}>
+        <ThemedText style={styles.searchLabel}>📍 Şehir Seçin</ThemedText>
+        
+        <Pressable
+          style={[styles.cityPickerButton, { 
+            borderColor: Colors[colorScheme].border,
+            backgroundColor: Colors[colorScheme].cardBackground 
+          }]}
+          onPress={() => setShowCityPicker(!showCityPicker)}>
+          <ThemedText style={selectedCity ? styles.citySelectedText : styles.cityPlaceholderText}>
+            {selectedCity ? selectedCity.name : 'Tüm Şehirler'}
           </ThemedText>
-          <ThemedText style={styles.heroSubtitle}>
-            Türkiye&apos;yi lezzet rotalarıyla keşfet. Yerel gurmelerin önerdiği duraklarla hemen başla.
+          <ThemedText style={styles.chevron}>{showCityPicker ? '▲' : '▼'}</ThemedText>
+        </Pressable>
+
+        {showCityPicker && (
+          <View style={[styles.cityDropdown, { 
+            borderColor: Colors[colorScheme].border,
+            backgroundColor: Colors[colorScheme].cardBackground 
+          }]}>
+            <TextInput
+              style={[styles.searchInput, { 
+                borderColor: Colors[colorScheme].border,
+                backgroundColor: Colors[colorScheme].background,
+                color: Colors[colorScheme].text 
+              }]}
+              placeholder="Şehir ara..."
+              placeholderTextColor={Colors[colorScheme].textLight}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+            
+            <ScrollView style={styles.cityList} nestedScrollEnabled>
+              <Pressable
+                style={[styles.cityItem, !selectedCityId && styles.cityItemActive]}
+                onPress={() => {
+                  setSelectedCityId('');
+                  setShowCityPicker(false);
+                  setSearchQuery('');
+                }}>
+                <ThemedText style={styles.cityItemText}>🌍 Tüm Şehirler</ThemedText>
+              </Pressable>
+              
+              {filteredCities.map((city) => (
+                <Pressable
+                  key={city.id}
+                  style={[
+                    styles.cityItem,
+                    city.id === selectedCityId && styles.cityItemActive,
+                    { borderBottomColor: Colors[colorScheme].border }
+                  ]}
+                  onPress={() => {
+                    setSelectedCityId(city.id);
+                    setShowCityPicker(false);
+                    setSearchQuery('');
+                  }}>
+                  <ThemedText style={styles.cityItemText}>{city.name}</ThemedText>
+                  {city.id === selectedCityId && <ThemedText>✓</ThemedText>}
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+      </View>
+
+      {/* Routes List */}
+      <View style={styles.routesSection}>
+        <View style={styles.routesHeader}>
+          <ThemedText type="subtitle">
+            {selectedCity ? `${selectedCity.name} Rotaları` : 'Tüm Rotalar'}
           </ThemedText>
-          {user && (
-            <ThemedText style={styles.welcomeText}>
-              Hoş geldin, {user.username}! 👋
+          <ThemedText style={styles.routesCount}>
+            {routes.length} rota
+          </ThemedText>
+        </View>
+
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={Colors[colorScheme].primary} />
+          </View>
+        ) : routes.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <ThemedText style={styles.emptyText}>
+              {selectedCity 
+                ? `${selectedCity.name} için henüz rota eklenmemiş.`
+                : 'Henüz rota eklenmemiş.'}
             </ThemedText>
-          )}
-          <View style={styles.heroActions}>
             <Pressable
-              style={[styles.ctaButton, { backgroundColor: Colors[colorScheme].primary }]}
-              onPress={handleAuthAction}>
-              <ThemedText style={styles.ctaLabel} lightColor="#FFFFFF" darkColor="#1D1411">
-                {user ? 'Rota Oluştur' : 'Hemen Başla'}
-              </ThemedText>
-            </Pressable>
-            <Pressable
-              style={[styles.secondaryButton, { borderColor: Colors[colorScheme].primary }]}
-              onPress={() => router.push('/(tabs)/explore')}>
-              <ThemedText
-                style={styles.secondaryLabel}
-                lightColor={Colors.light.primary}
-                darkColor={Colors.dark.primary}>
-                Keşfet
+              style={[styles.createButton, { backgroundColor: Colors[colorScheme].primary }]}
+              onPress={() => router.push('/(tabs)/create')}>
+              <ThemedText style={styles.createButtonText} lightColor="#FFFFFF" darkColor="#1D1411">
+                ➕ İlk Rotayı Sen Oluştur
               </ThemedText>
             </Pressable>
           </View>
-        </View>
-        <Image
-          source={{
-            uri: 'https://images.unsplash.com/photo-1481931098730-318b6f776db0?auto=format&fit=crop&w=800&q=80',
-          }}
-          style={styles.heroImage}
-        />
-      </ThemedView>
-
-      {/* Top Rated Rotalar */}
-      {topRatedRoutes.length > 0 && (
-        <Section
-          title="En Yüksek Puanlı Rotalar"
-          subtitle="Kullanıcıların en çok beğendiği lezzet yolculukları"
-          data={topRatedRoutes}
-          renderItem={(route) => (
-            <RouteCard
-              key={route.id}
-              route={route}
-              colorScheme={colorScheme}
-              onPress={() => router.push(`/route/${route.id}`)}
-            />
-          )}
-        />
-      )}
-
-      {/* Şehirler */}
-      <ThemedView style={styles.sectionHeader}>
-        <ThemedText type="subtitle">Popüler Şehirler</ThemedText>
-        <ThemedText style={styles.sectionDescription}>
-          İl/ilçe bazlı rotaları keşfet ve favorilerini kaydet
-        </ThemedText>
-      </ThemedView>
-      <FlatList
-        data={highlightedCities}
-        keyExtractor={(item) => item.id}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.cityList}
-        ItemSeparatorComponent={() => <View style={styles.citySeparator} />}
-        renderItem={({ item }) => (
-          <CityCard
-            city={item}
-            colorScheme={colorScheme}
-            onPress={() => router.push(`/city/${item.id}`)}
+        ) : (
+          <FlatList
+            data={routes}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
+              <RouteCard
+                route={item}
+                colorScheme={colorScheme}
+                onPress={() => router.push(`/route/${item.id}`)}
+              />
+            )}
+            contentContainerStyle={styles.routesList}
+            showsVerticalScrollIndicator={false}
           />
         )}
-      />
-
-      {/* Trending Rotalar */}
-      {trendingRoutes.length > 0 && (
-        <Section
-          title="Trend Rotalar"
-          subtitle="Bu hafta en çok görüntülenen lezzet rotaları"
-          data={trendingRoutes}
-          renderItem={(route) => (
-            <RouteCompact
-              key={route.id}
-              route={route}
-              colorScheme={colorScheme}
-              onPress={() => router.push(`/route/${route.id}`)}
-            />
-          )}
-        />
-      )}
-    </ScrollView>
-  );
-}
-
-type SectionProps<T> = {
-  title: string;
-  subtitle?: string;
-  data: T[];
-  renderItem: (item: T, index: number) => React.ReactElement;
-};
-
-function Section<T>({ title, subtitle, data, renderItem }: SectionProps<T>) {
-  if (!data.length) {
-    return null;
-  }
-
-  return (
-    <ThemedView style={styles.section}>
-      <ThemedText type="subtitle" style={styles.sectionTitle}>
-        {title}
-      </ThemedText>
-      {subtitle ? <ThemedText style={styles.sectionDescription}>{subtitle}</ThemedText> : null}
-      <View style={styles.sectionContent}>{data.map((item, index) => renderItem(item, index))}</View>
+      </View>
     </ThemedView>
   );
 }
 
-function RouteCard({
-  route,
-  colorScheme,
-  onPress,
-}: {
-  route: Route;
-  colorScheme: 'light' | 'dark';
-  onPress: () => void;
-}) {
-  const stopCount = route.stops?.length || 0;
-
-  return (
-    <Pressable onPress={onPress} accessibilityRole="button">
-      <ThemedView style={[styles.routeCard, { borderColor: Colors[colorScheme].border }]}>
-        <Image source={{ uri: route.coverImage }} style={styles.routeImage} />
-        <View style={styles.routeContent}>
-          <View style={styles.routeHeader}>
-            <ThemedText type="subtitle" style={styles.routeTitle}>
-              {route.title}
-            </ThemedText>
-            <View style={styles.ratingBadge}>
-              <ThemedText style={styles.routeRating}>
-                ⭐ {route.averageRating.toFixed(1)}
-              </ThemedText>
-              <ThemedText style={styles.ratingCount}>({route.ratingCount})</ThemedText>
-            </View>
-          </View>
-          <ThemedText style={styles.routeDescription} numberOfLines={2}>
-            {route.description}
-          </ThemedText>
-          <View style={styles.routeMetaRow}>
-            <MetaPill label={`${stopCount} durak`} colorScheme={colorScheme} />
-            <MetaPill label={`${Math.round(route.distanceKm)} km`} colorScheme={colorScheme} />
-            <MetaPill label={`${route.durationMinutes} dk`} colorScheme={colorScheme} />
-          </View>
-          <View style={styles.routeFooter}>
-            <View style={styles.authorInfo}>
-              <ThemedText style={styles.authorName}>@{route.author.username}</ThemedText>
-              {route.author.isVerified && <ThemedText>✓</ThemedText>}
-            </View>
-            <View style={styles.tagRow}>
-              {route.tags.slice(0, 2).map((tag) => (
-                <Tag key={tag} label={tag} colorScheme={colorScheme} />
-              ))}
-            </View>
-          </View>
-        </View>
-      </ThemedView>
-    </Pressable>
-  );
-}
-
-function RouteCompact({
-  route,
-  colorScheme,
-  onPress,
-}: {
-  route: Route;
-  colorScheme: 'light' | 'dark';
+// Route Card Component
+function RouteCard({ 
+  route, 
+  colorScheme, 
+  onPress 
+}: { 
+  route: Route; 
+  colorScheme: 'light' | 'dark'; 
   onPress: () => void;
 }) {
   return (
-    <Pressable onPress={onPress} accessibilityRole="button">
-      <ThemedView style={[styles.routeCompact, { borderColor: Colors[colorScheme].border }]}>
-        <Image source={{ uri: route.coverImage }} style={styles.routeCompactImage} />
-        <View style={styles.routeCompactContent}>
-          <ThemedText style={styles.routeCompactTitle} numberOfLines={1}>
+    <Pressable
+      style={[styles.routeCard, { 
+        backgroundColor: Colors[colorScheme].cardBackground,
+        borderColor: Colors[colorScheme].border 
+      }]}
+      onPress={onPress}>
+      <Image
+        source={{ uri: route.coverImage }}
+        style={styles.routeImage}
+        contentFit="cover"
+      />
+      
+      <View style={styles.routeContent}>
+        <View style={styles.routeHeader}>
+          <ThemedText style={styles.routeTitle} numberOfLines={2}>
             {route.title}
           </ThemedText>
-          <ThemedText style={styles.routeCompactMeta}>
-            {route.stops?.length || 0} durak • ⭐ {route.averageRating.toFixed(1)} ({route.ratingCount})
-          </ThemedText>
-          <View style={styles.compactTagRow}>
-            {route.tags.slice(0, 2).map((tag) => (
-              <Tag key={tag} label={tag} colorScheme={colorScheme} compact />
+          <View style={styles.ratingBadge}>
+            <ThemedText style={styles.ratingText}>⭐ {route.averageRating.toFixed(1)}</ThemedText>
+          </View>
+        </View>
+        
+        <ThemedText style={styles.routeDescription} numberOfLines={2}>
+          {route.description}
+        </ThemedText>
+        
+        <View style={styles.routeMeta}>
+          <ThemedText style={styles.metaText}>⏱️ {route.durationMinutes} dk</ThemedText>
+          <ThemedText style={styles.metaText}>📍 {route.distanceKm} km</ThemedText>
+          <ThemedText style={styles.metaText}>👁️ {route.viewCount}</ThemedText>
+        </View>
+        
+        {route.tags && route.tags.length > 0 && (
+          <View style={styles.tagRow}>
+            {route.tags.slice(0, 3).map((tag, idx) => (
+              <View key={idx} style={[styles.tag, { backgroundColor: Colors[colorScheme].badgeOrange }]}>
+                <ThemedText style={styles.tagText}>{tag}</ThemedText>
+              </View>
             ))}
           </View>
-        </View>
-      </ThemedView>
+        )}
+      </View>
     </Pressable>
-  );
-}
-
-function CityCard({
-  city,
-  colorScheme,
-  onPress,
-}: {
-  city: any;
-  colorScheme: 'light' | 'dark';
-  onPress: () => void;
-}) {
-  return (
-    <Pressable onPress={onPress} accessibilityRole="button">
-      <ThemedView style={[styles.cityCard, { borderColor: Colors[colorScheme].border }]}>
-        <Image source={{ uri: city.heroImage }} style={styles.cityImage} />
-        <View style={styles.cityContent}>
-          <ThemedText type="subtitle">{city.name}</ThemedText>
-          <ThemedText style={styles.cityDescription} numberOfLines={2}>
-            {city.description}
-          </ThemedText>
-          <View style={styles.tagRow}>
-            {city.highlightTags?.slice(0, 2).map((tag: string) => (
-              <Tag key={tag} label={tag} colorScheme={colorScheme} compact />
-            )) || null}
-          </View>
-        </View>
-      </ThemedView>
-    </Pressable>
-  );
-}
-
-function MetaPill({ label, colorScheme }: { label: string; colorScheme: 'light' | 'dark' }) {
-  return (
-    <View style={[styles.metaPill, { backgroundColor: Colors[colorScheme].badgeOrange }]}>
-      <ThemedText style={styles.metaPillText}>{label}</ThemedText>
-    </View>
-  );
-}
-
-function Tag({
-  label,
-  colorScheme,
-  compact = false,
-}: {
-  label: string;
-  colorScheme: 'light' | 'dark';
-  compact?: boolean;
-}) {
-  return (
-    <View
-      style={[
-        styles.tag,
-        {
-          backgroundColor: Colors[colorScheme].badgeYellow,
-          borderColor: Colors[colorScheme].accent,
-          paddingHorizontal: compact ? 8 : 12,
-          paddingVertical: compact ? 4 : 6,
-        },
-      ]}>
-      <ThemedText
-        style={[styles.tagText, { fontSize: compact ? 11 : 12 }]}
-        lightColor={Colors.light.textSecondary}
-        darkColor={Colors.dark.textSecondary}>
-        #{label}
-      </ThemedText>
-    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    paddingBottom: 32,
-    gap: 24,
+    flex: 1,
+  },
+  header: {
+    paddingTop: 60,
+    paddingBottom: 30,
+    paddingHorizontal: 20,
+  },
+  headerTitle: {
+    fontSize: 36,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  headerSubtitle: {
+    fontSize: 16,
+    opacity: 0.9,
+  },
+  searchSection: {
+    padding: 20,
+    gap: 12,
+  },
+  searchLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  cityPickerButton: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  citySelectedText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  cityPlaceholderText: {
+    fontSize: 16,
+    opacity: 0.5,
+  },
+  chevron: {
+    fontSize: 12,
+  },
+  cityDropdown: {
+    borderRadius: 12,
+    borderWidth: 1,
+    maxHeight: 400,
+    overflow: 'hidden',
+  },
+  searchInput: {
+    padding: 12,
+    borderBottomWidth: 1,
+    fontSize: 16,
+  },
+  cityList: {
+    maxHeight: 350,
+  },
+  cityItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+  },
+  cityItemActive: {
+    backgroundColor: 'rgba(255, 107, 53, 0.1)',
+  },
+  cityItemText: {
+    fontSize: 16,
+  },
+  routesSection: {
+    flex: 1,
+    paddingHorizontal: 20,
+  },
+  routesHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  routesCount: {
+    fontSize: 14,
+    opacity: 0.6,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingVertical: 60,
   },
-  heroCard: {
-    marginTop: 24,
-    marginHorizontal: 20,
-    padding: 20,
-    borderRadius: 24,
-    borderWidth: 1,
-    overflow: 'hidden',
-    flexDirection: 'row',
-    gap: 16,
-  },
-  heroContent: {
+  emptyContainer: {
     flex: 1,
-    gap: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 60,
+    gap: 20,
   },
-  heroTitle: {
-    fontSize: 40,
-  },
-  heroSubtitle: {
-    lineHeight: 24,
-  },
-  welcomeText: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginTop: 4,
-  },
-  heroActions: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 8,
-  },
-  ctaButton: {
-    borderRadius: 16,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-  },
-  ctaLabel: {
-    fontWeight: '700',
+  emptyText: {
     fontSize: 16,
+    textAlign: 'center',
+    opacity: 0.6,
   },
-  secondaryButton: {
-    borderRadius: 16,
-    borderWidth: 2,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+  createButton: {
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderRadius: 12,
   },
-  secondaryLabel: {
+  createButtonText: {
+    fontSize: 16,
     fontWeight: '700',
   },
-  heroImage: {
-    width: 120,
-    height: 120,
-    borderRadius: 20,
-  },
-  section: {
-    marginTop: 16,
-    gap: 12,
-    paddingHorizontal: 20,
-  },
-  sectionHeader: {
-    marginTop: 16,
-    paddingHorizontal: 20,
-    gap: 6,
-  },
-  sectionTitle: {
-    fontSize: 24,
-  },
-  sectionDescription: {
-    lineHeight: 22,
-  },
-  sectionContent: {
+  routesList: {
+    paddingBottom: 100,
     gap: 16,
   },
   routeCard: {
-    borderRadius: 24,
-    borderWidth: 1,
+    borderRadius: 16,
     overflow: 'hidden',
+    borderWidth: 1,
   },
   routeImage: {
+    width: '100%',
     height: 180,
   },
   routeContent: {
     padding: 16,
-    gap: 10,
+    gap: 12,
   },
   routeHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
+    gap: 12,
   },
   routeTitle: {
     flex: 1,
-    marginRight: 8,
-    fontSize: 20,
+    fontSize: 18,
+    fontWeight: '700',
+    lineHeight: 24,
   },
   ratingBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    backgroundColor: '#FFF3E0',
   },
-  routeRating: {
-    fontWeight: '700',
-    fontSize: 16,
-  },
-  ratingCount: {
-    fontSize: 12,
+  ratingText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FF6B35',
   },
   routeDescription: {
-    lineHeight: 22,
+    fontSize: 14,
+    lineHeight: 20,
+    opacity: 0.7,
   },
-  routeMetaRow: {
+  routeMeta: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
+    gap: 16,
   },
-  routeFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  authorInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  authorName: {
+  metaText: {
     fontSize: 13,
-    fontWeight: '600',
+    opacity: 0.6,
   },
   tagRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 6,
-  },
-  cityList: {
-    paddingHorizontal: 20,
-  },
-  citySeparator: {
-    width: 16,
-  },
-  cityCard: {
-    width: 260,
-    borderRadius: 24,
-    borderWidth: 1,
-    overflow: 'hidden',
-  },
-  cityImage: {
-    height: 130,
-    width: '100%',
-  },
-  cityContent: {
-    padding: 16,
     gap: 8,
   },
-  cityDescription: {
-    lineHeight: 20,
-    fontSize: 14,
-  },
-  metaPill: {
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  metaPillText: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
   tag: {
-    borderWidth: 1,
-    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
   },
   tagText: {
-    fontWeight: '600',
-  },
-  routeCompact: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    borderRadius: 20,
-    padding: 12,
-    borderWidth: 1,
-  },
-  routeCompactImage: {
-    width: 70,
-    height: 70,
-    borderRadius: 14,
-  },
-  routeCompactContent: {
-    flex: 1,
-    gap: 4,
-  },
-  routeCompactTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  routeCompactMeta: {
     fontSize: 12,
-  },
-  compactTagRow: {
-    flexDirection: 'row',
-    gap: 6,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
 });

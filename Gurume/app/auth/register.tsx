@@ -9,6 +9,7 @@
 
 import { router } from 'expo-router';
 import React, { useState } from 'react';
+import { Image } from 'expo-image';
 import {
   ActivityIndicator,
   Alert,
@@ -87,11 +88,16 @@ export default function RegisterScreen() {
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <ThemedView style={styles.content}>
           <View style={styles.header}>
+            <Image 
+              source={require('@/assets/images/icon.png')} 
+              style={styles.logo}
+              contentFit="contain"
+            />
             <ThemedText type="title" style={styles.title}>
               Hesap Oluştur
             </ThemedText>
-            <ThemedText style={styles.subtitle}>
-              Gurume&apos;ye katıl ve rotalarını paylaş
+            <ThemedText style={styles.subtitle} numberOfLines={2}>
+              Gurume&apos;ye katıl, rotalarını paylaş
             </ThemedText>
           </View>
 
@@ -227,7 +233,8 @@ export default function RegisterScreen() {
               <ThemedText
                 style={styles.linkText}
                 lightColor={Colors.light.primary}
-                darkColor={Colors.dark.primary}>
+                darkColor={Colors.dark.primary}
+                numberOfLines={1}>
                 Zaten hesabınız var mı? Giriş yapın
               </ThemedText>
             </Pressable>
@@ -253,14 +260,22 @@ const styles = StyleSheet.create({
   header: {
     alignItems: 'center',
     marginBottom: 32,
+    gap: 8,
+  },
+  logo: {
+    width: 70,
+    height: 70,
+    marginBottom: 4,
   },
   title: {
-    fontSize: 36,
-    marginBottom: 8,
+    fontSize: 32,
+    marginBottom: 4,
   },
   subtitle: {
-    fontSize: 16,
+    fontSize: 15,
     textAlign: 'center',
+    lineHeight: 22,
+    maxWidth: '80%',
   },
   form: {
     gap: 16,

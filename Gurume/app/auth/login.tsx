@@ -9,6 +9,7 @@
 
 import { router } from 'expo-router';
 import React, { useState } from 'react';
+import { Image } from 'expo-image';
 import {
   ActivityIndicator,
   Alert,
@@ -59,11 +60,16 @@ export default function LoginScreen() {
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <ThemedView style={styles.content}>
           <View style={styles.header}>
+            <Image 
+              source={require('@/assets/images/icon.png')} 
+              style={styles.logo}
+              contentFit="contain"
+            />
             <ThemedText type="title" style={styles.title}>
               Gurume
             </ThemedText>
-            <ThemedText style={styles.subtitle}>
-              Türkiye&apos;yi lezzet rotalarıyla keşfet
+            <ThemedText style={styles.subtitle} numberOfLines={2}>
+              Türkiye&apos;nin lezzet rotaları
             </ThemedText>
           </View>
 
@@ -167,14 +173,22 @@ const styles = StyleSheet.create({
   header: {
     alignItems: 'center',
     marginBottom: 48,
+    gap: 12,
   },
-  title: {
-    fontSize: 48,
+  logo: {
+    width: 80,
+    height: 80,
     marginBottom: 8,
   },
+  title: {
+    fontSize: 40,
+    marginBottom: 4,
+  },
   subtitle: {
-    fontSize: 16,
+    fontSize: 15,
     textAlign: 'center',
+    lineHeight: 22,
+    maxWidth: '80%',
   },
   form: {
     gap: 16,

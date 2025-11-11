@@ -137,7 +137,7 @@ export default function ExploreScreen() {
                   Tümü
                 </ThemedText>
               </Pressable>
-              {turkeyCities.slice(0, 15).map((city) => (
+              {turkeyCities.map((city) => (
                 <Pressable
                   key={city.id}
                   style={[
@@ -149,7 +149,8 @@ export default function ExploreScreen() {
                   <ThemedText
                     style={styles.cityButtonText}
                     lightColor={selectedCityId === city.id ? '#FFFFFF' : Colors.light.text}
-                    darkColor={selectedCityId === city.id ? '#1D1411' : Colors.dark.text}>
+                    darkColor={selectedCityId === city.id ? '#1D1411' : Colors.dark.text}
+                    numberOfLines={1}>
                     {city.name}
                   </ThemedText>
                 </Pressable>
