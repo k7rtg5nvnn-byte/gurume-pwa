@@ -174,15 +174,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 48,
     gap: 12,
+    overflow: 'visible',
   },
   logo: {
-    width: 80,
-    height: 80,
-    marginBottom: 8,
+    width: 120,
+    height: 120,
+    marginBottom: 12,
   },
   title: {
-    fontSize: 40,
-    marginBottom: 4,
+    fontSize: 36,
+    marginBottom: 8,
+    textAlign: 'center',
   },
   subtitle: {
     fontSize: 14,

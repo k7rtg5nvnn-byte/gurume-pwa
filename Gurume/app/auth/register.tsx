@@ -260,16 +260,18 @@ const styles = StyleSheet.create({
   header: {
     alignItems: 'center',
     marginBottom: 32,
-    gap: 8,
+    gap: 12,
+    overflow: 'visible',
   },
   logo: {
-    width: 70,
-    height: 70,
-    marginBottom: 4,
+    width: 120,
+    height: 120,
+    marginBottom: 12,
   },
   title: {
     fontSize: 32,
-    marginBottom: 4,
+    marginBottom: 8,
+    textAlign: 'center',
   },
   subtitle: {
     fontSize: 14,
