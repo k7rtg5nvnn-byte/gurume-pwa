@@ -187,7 +187,7 @@ class ImageUploadService {
 
       // Base64 formatına çevir
       const base64 = await FileSystem.readAsStringAsync(imageAsset.uri, {
-        encoding: FileSystem.EncodingType.Base64,
+        encoding: 'base64',
       });
 
       // Supabase'e yükle
