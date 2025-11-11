@@ -9,7 +9,7 @@ const fs = require('fs');
 const path = require('path');
 
 const assetsDir = path.join(__dirname, '..', 'assets', 'images');
-const sourceImage = path.join(assetsDir, 'new-logo.jpeg');
+const sourceImage = path.join(__dirname, '..', 'assets', 'logo', 'WhatsApp Image 2025-11-11 at 18.44.49.jpeg');
 
 async function updateAllLogos() {
   console.log('🎨 Logo güncelleniyor...');
