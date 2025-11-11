@@ -84,11 +84,13 @@ export default function WelcomeScreen() {
     <ThemedView style={styles.container}>
       {/* Header with Logo */}
       <View style={styles.header}>
-        <Image 
-          source={require('@/assets/images/icon.png')} 
-          style={styles.logo}
-          contentFit="contain"
-        />
+        <View style={styles.logoContainer}>
+          <Image 
+            source={require('@/assets/images/icon.png')} 
+            style={styles.logo}
+            contentFit="contain"
+          />
+        </View>
         <ThemedText type="title" style={styles.appName}>
           Gurume
         </ThemedText>
@@ -161,15 +163,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: 60,
     paddingBottom: 20,
-    gap: 8,
+    gap: 12,
+  },
+  logoContainer: {
+    width: 100,
+    height: 100,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'visible',
   },
   logo: {
-    width: 80,
-    height: 80,
+    width: 100,
+    height: 100,
   },
   appName: {
     fontSize: 32,
     fontWeight: 'bold',
+    textAlign: 'center',
   },
   slide: {
     width,
