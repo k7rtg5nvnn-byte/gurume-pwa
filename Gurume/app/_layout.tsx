@@ -19,10 +19,12 @@ export default function RootLayout() {
       <AuthProvider>
         <GurumeDataProvider>
           <Stack>
-            <Stack.Screen name="welcome/index" options={{ headerShown: false }} />
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen name="auth/login" options={{ headerShown: false }} />
-            <Stack.Screen name="auth/register" options={{ headerShown: false }} />
+            <Stack.Screen name="welcome/index" options={{ headerShown: false, title: 'Hoş Geldiniz' }} />
+            <Stack.Screen name="(tabs)" options={{ headerShown: false, title: 'Gurume' }} />
+            <Stack.Screen name="auth/login" options={{ headerShown: false, title: 'Giriş Yap' }} />
+            <Stack.Screen name="auth/register" options={{ headerShown: false, title: 'Kayıt Ol' }} />
+            <Stack.Screen name="route/[id]" options={{ headerShown: true, title: 'Rota Detay', headerBackTitle: 'Geri' }} />
+            <Stack.Screen name="city/[id]" options={{ headerShown: true, title: 'Şehir Rotaları', headerBackTitle: 'Geri' }} />
             <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
           </Stack>
           <StatusBar style="auto" />

@@ -35,7 +35,7 @@ class PlacesService {
   async searchPlaces(options: PlaceSearchOptions): Promise<PlaceResult[]> {
     try {
       if (!GOOGLE_API_KEY) {
-        console.error('Google Maps API key bulunamadı');
+        console.warn('Google Maps API key bulunamadı - mock data kullanılıyor');
         return this.getMockPlaces(options.query);
       }
 
@@ -89,7 +89,7 @@ class PlacesService {
   ): Promise<PlaceResult[]> {
     try {
       if (!GOOGLE_API_KEY) {
-        console.error('Google Maps API key bulunamadı');
+        console.warn('Google Maps API key bulunamadı - mock data kullanılıyor');
         return [];
       }
 
@@ -127,7 +127,7 @@ class PlacesService {
   async getPlaceDetails(placeId: string): Promise<PlaceResult | null> {
     try {
       if (!GOOGLE_API_KEY) {
-        console.error('Google Maps API key bulunamadı');
+        console.warn('Google Maps API key bulunamadı - mock data kullanılıyor');
         return null;
       }
 
