@@ -308,9 +308,9 @@ function CityCard({
             {city.description}
           </ThemedText>
           <View style={styles.tagRow}>
-            {city.highlightTags.slice(0, 2).map((tag: string) => (
+            {city.highlightTags?.slice(0, 2).map((tag: string) => (
               <Tag key={tag} label={tag} colorScheme={colorScheme} compact />
-            ))}
+            )) || null}
           </View>
         </View>
       </ThemedView>
