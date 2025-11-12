@@ -186,8 +186,8 @@ class RoutesService {
         tags: input.tags,
         difficulty: input.difficulty,
         budget_range: input.budgetRange,
-        is_published: false, // Moderasyon için bekliyor
-        moderation_status: 'pending',
+        is_published: true, // Direkt yayınla (moderasyon yok)
+        moderation_status: 'approved',
       };
 
       console.log('💾 INSERT DATA:', JSON.stringify(insertData, null, 2));
