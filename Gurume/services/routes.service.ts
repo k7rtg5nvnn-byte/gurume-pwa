@@ -168,10 +168,6 @@ class RoutesService {
    */
   async createRoute(input: CreateRouteInput, userId: string): Promise<ApiResponse<Route>> {
     try {
-      console.log('🔧 createRoute SERVICE called');
-      console.log('📦 Input:', JSON.stringify(input, null, 2));
-      console.log('👤 UserId:', userId);
-
       // Rota kaydı oluştur
       const insertData = {
         author_id: userId,
@@ -190,19 +186,14 @@ class RoutesService {
         moderation_status: 'approved',
       };
 
-      console.log('💾 INSERT DATA:', JSON.stringify(insertData, null, 2));
-
       const { data: routeData, error: routeError } = await supabase
         .from('routes')
         .insert(insertData)
         .select()
         .single();
 
-      console.log('📥 SUPABASE RESPONSE - routeData:', routeData);
-      console.log('📥 SUPABASE RESPONSE - routeError:', routeError);
-
       if (routeError || !routeData) {
-        console.error('❌ ROUTE INSERT FAILED:', routeError);
+        console.error('Route insert error:', routeError);
         return {
           success: false,
           error: {
@@ -212,8 +203,6 @@ class RoutesService {
           },
         };
       }
-
-      console.log('✅ ROUTE CREATED WITH ID:', routeData.id);
 
       // Durakları ekle
       if (input.stops && input.stops.length > 0) {
