@@ -627,19 +627,28 @@ export default function CreateRouteScreen() {
         })),
       };
 
+      console.log('🚀 ROTA OLUŞTURULUYOR...');
+      console.log('📦 RouteInput:', JSON.stringify(routeInput, null, 2));
+      console.log('👤 UserId:', user.id);
+
       const response = await routesService.createRoute(routeInput, user.id);
 
+      console.log('📥 RESPONSE:', JSON.stringify(response, null, 2));
+
       if (response.success) {
+        console.log('✅ ROTA BAŞARIYLA OLUŞTURULDU!');
         Alert.alert(
           'Başarılı! 🎉',
           'Rotanız oluşturuldu ve yayına girdi.',
           [{ text: 'Tamam', onPress: () => router.push('/(tabs)/explore') }]
         );
       } else {
+        console.error('❌ ROTA OLUŞTURULAMADI:', response.error);
         Alert.alert('Hata', response.error?.message || 'Rota oluşturulamadı.');
       }
     } catch (error) {
-      console.error('Submit error:', error);
+      console.error('💥 SUBMIT ERROR:', error);
+      console.error('💥 ERROR STACK:', error instanceof Error ? error.stack : 'No stack');
       Alert.alert('Hata', 'Bir sorun oluştu.');
     } finally {
       setLoading(false);
