@@ -71,7 +71,10 @@ async function seedCitiesAndDistricts() {
       id: city.id,
       name: city.name,
       slug: city.slug,
-      region: 'Türkiye', // Varsayılan bölge
+      description: `${city.name} lezzet rotaları`,
+      hero_image: null,
+      highlight_tags: [],
+      signature_dishes: [],
       latitude: 0, // Placeholder
       longitude: 0, // Placeholder
     }));
