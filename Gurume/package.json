@@ -22,7 +22,6 @@
     "@react-native-picker/picker": "^2.11.4",
     "@react-navigation/bottom-tabs": "^7.4.0",
     "@react-navigation/native": "^7.1.8",
-    "@supabase/supabase-js": "^2.80.0",
     "expo": "~54.0.22",
     "expo-constants": "~18.0.10",
     "expo-dotenv": "^0.1.0",
@@ -53,10 +52,12 @@
     "react-native-worklets": "0.5.1"
   },
   "devDependencies": {
+    "@supabase/supabase-js": "^2.81.1",
     "@types/react": "~19.1.0",
     "eslint": "^9.25.0",
     "eslint-config-expo": "~10.0.0",
     "sharp": "^0.34.5",
+    "tsx": "^4.20.6",
     "typescript": "~5.9.2"
   },
   "private": true
