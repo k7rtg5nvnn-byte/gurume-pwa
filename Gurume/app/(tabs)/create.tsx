@@ -1,10 +1,11 @@
 /**
- * ROTA OLUŞTURMA - YENİDEN TASARIM
+ * ROTA OLUŞTURMA - YENİ TASARIM
  * 
- * Basit, kullanışlı, adım adım
- * - İl/İlçe seçimi çalışıyor
- * - Google Maps entegrasyonu aktif
- * - Temiz UI
+ * Hızlı, kolay, modern
+ * - Başlık otomatik (opsiyonel)
+ * - Her mekan için görsel + rating
+ * - Açıklama opsiyonel
+ * - Submit sonrası reset
  */
 
 import React, { useState } from 'react';
@@ -20,7 +21,6 @@ import {
   View,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import * as ImagePicker from 'expo-image-picker';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -32,6 +32,13 @@ import { routesService } from '@/services/routes.service';
 import { imageUploadService } from '@/services/image-upload.service';
 import { placesService } from '@/services/places.service';
 
+interface StopRating {
+  cleanliness: number; // Temizlik (1-5)
+  price: number; // Fiyat Performans (1-5)
+  quality: number; // Kalite (1-5)
+  speed: number; // Hız/Servis (1-5)
+}
+
 interface Stop {
   order: number;
   placeName: string;
@@ -39,6 +46,8 @@ interface Stop {
   notes: string;
   duration: number;
   googlePlaceId?: string;
+  image?: string; // Her mekan için ayrı görsel
+  rating?: StopRating; // Her mekan için rating
 }
 
 export default function CreateRouteScreen() {
@@ -49,15 +58,13 @@ export default function CreateRouteScreen() {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
 
-  // Step 1: Temel Bilgiler
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
+  // Step 1: Şehir Seçimi (basit!)
   const [cityId, setCityId] = useState('');
   const [districtIds, setDistrictIds] = useState<string[]>([]);
-  const [durationMinutes, setDurationMinutes] = useState('120');
-  const [tags, setTags] = useState('');
+  const [showCityPicker, setShowCityPicker] = useState(false);
+  const [showDistrictPicker, setShowDistrictPicker] = useState(false);
 
-  // Step 2: Duraklar
+  // Step 2: Mekanlar (her biri rating + görsel ile)
   const [stops, setStops] = useState<Stop[]>([]);
   const [currentPlaceName, setCurrentPlaceName] = useState('');
   const [currentNotes, setCurrentNotes] = useState('');
@@ -65,17 +72,41 @@ export default function CreateRouteScreen() {
   const [placeSearch, setPlaceSearch] = useState('');
   const [placeResults, setPlaceResults] = useState<any[]>([]);
   const [searchingPlaces, setSearchingPlaces] = useState(false);
+  
+  // Rating state for current stop
+  const [currentRating, setCurrentRating] = useState<StopRating>({
+    cleanliness: 5,
+    price: 5,
+    quality: 5,
+    speed: 5,
+  });
+  const [currentStopImage, setCurrentStopImage] = useState('');
 
-  // Step 3: Görseller
+  // Step 3: Final (opsiyonel bilgiler)
+  const [title, setTitle] = useState(''); // Opsiyonel
+  const [description, setDescription] = useState(''); // Opsiyonel
   const [coverImage, setCoverImage] = useState('');
-  const [additionalImages, setAdditionalImages] = useState<string[]>([]);
-
-  // UI State
-  const [showCityPicker, setShowCityPicker] = useState(false);
-  const [showDistrictPicker, setShowDistrictPicker] = useState(false);
 
   const selectedCity = turkeyCities.find(c => c.id === cityId);
   const selectedDistricts = selectedCity?.districts.filter(d => districtIds.includes(d.id)) || [];
+
+  // Form reset fonksiyonu
+  const resetForm = () => {
+    setStep(1);
+    setCityId('');
+    setDistrictIds([]);
+    setStops([]);
+    setTitle('');
+    setDescription('');
+    setCoverImage('');
+    setCurrentPlaceName('');
+    setCurrentNotes('');
+    setCurrentDuration('30');
+    setPlaceSearch('');
+    setPlaceResults([]);
+    setCurrentRating({ cleanliness: 5, price: 5, quality: 5, speed: 5 });
+    setCurrentStopImage('');
+  };
 
   if (!user) {
     return (
@@ -94,105 +125,80 @@ export default function CreateRouteScreen() {
     );
   }
 
-  // ========== STEP 1: TEMEL BİLGİLER ==========
+  // ========== STEP 1: ŞEHİR SEÇİMİ ==========
   const renderStep1 = () => (
     <ScrollView style={styles.stepContent}>
-      <ThemedText style={styles.stepTitle}>📝 Temel Bilgiler</ThemedText>
+      <ThemedText style={styles.stepTitle}>📍 Rotanız Hangi Şehirde?</ThemedText>
 
-      {/* Başlık */}
-      <View style={styles.field}>
-        <ThemedText style={styles.label}>Rota Başlığı *</ThemedText>
-        <TextInput
-          style={[styles.input, { 
-            borderColor: Colors[colorScheme].border,
-            backgroundColor: Colors[colorScheme].cardBackground,
-            color: Colors[colorScheme].text 
-          }]}
-          placeholder="Örn: Ankara'nın En İyi Kahvecileri"
-          placeholderTextColor={Colors[colorScheme].textLight}
-          value={title}
-          onChangeText={setTitle}
-        />
-      </View>
+      {/* Şehir Seçici */}
+      <Pressable
+        style={[styles.pickerButton, { 
+          borderColor: Colors[colorScheme].border,
+          backgroundColor: Colors[colorScheme].cardBackground 
+        }]}
+        onPress={() => setShowCityPicker(!showCityPicker)}>
+        <ThemedText style={styles.pickerButtonText}>
+          {selectedCity ? `${selectedCity.name}` : 'Şehir Seç *'}
+        </ThemedText>
+        <ThemedText style={styles.pickerButtonIcon}>
+          {showCityPicker ? '▲' : '▼'}
+        </ThemedText>
+      </Pressable>
 
-      {/* Şehir Seçimi */}
-      <View style={styles.field}>
-        <ThemedText style={styles.label}>📍 Şehir *</ThemedText>
-        <Pressable
-          style={[styles.picker, { 
-            borderColor: Colors[colorScheme].border,
-            backgroundColor: Colors[colorScheme].cardBackground 
-          }]}
-          onPress={() => setShowCityPicker(!showCityPicker)}>
-          <ThemedText style={selectedCity ? styles.pickerSelected : styles.pickerPlaceholder}>
-            {selectedCity ? selectedCity.name : 'Şehir seçin'}
-          </ThemedText>
-          <ThemedText>{showCityPicker ? '▲' : '▼'}</ThemedText>
-        </Pressable>
+      {showCityPicker && (
+        <ScrollView style={[styles.pickerDropdown, { 
+          borderColor: Colors[colorScheme].border,
+          backgroundColor: Colors[colorScheme].cardBackground,
+          maxHeight: 300 
+        }]}>
+          {turkeyCities.map((city) => (
+            <Pressable
+              key={city.id}
+              style={[styles.pickerItem, cityId === city.id && { backgroundColor: Colors[colorScheme].primary + '20' }]}
+              onPress={() => {
+                setCityId(city.id);
+                setDistrictIds([]);
+                setShowCityPicker(false);
+                setShowDistrictPicker(true);
+              }}>
+              <ThemedText style={styles.pickerItemText}>{city.name}</ThemedText>
+            </Pressable>
+          ))}
+        </ScrollView>
+      )}
 
-        {showCityPicker && (
-          <ScrollView 
-            style={[styles.dropdown, { 
-              borderColor: Colors[colorScheme].border,
-              backgroundColor: Colors[colorScheme].cardBackground 
-            }]}
-            nestedScrollEnabled>
-            {turkeyCities.map((city) => (
-              <Pressable
-                key={city.id}
-                style={[
-                  styles.dropdownItem,
-                  city.id === cityId && styles.dropdownItemActive,
-                  { borderBottomColor: Colors[colorScheme].border }
-                ]}
-                onPress={() => {
-                  setCityId(city.id);
-                  setDistrictIds([]);
-                  setShowCityPicker(false);
-                }}>
-                <ThemedText>{city.name}</ThemedText>
-                {city.id === cityId && <ThemedText>✓</ThemedText>}
-              </Pressable>
-            ))}
-          </ScrollView>
-        )}
-      </View>
-
-      {/* İlçe Seçimi - Sadece şehir seçildiyse göster */}
+      {/* İlçe Seçici (opsiyonel) */}
       {selectedCity && (
-        <View style={styles.field}>
-          <ThemedText style={styles.label}>🏘️ İlçeler (Opsiyonel)</ThemedText>
+        <>
           <Pressable
-            style={[styles.picker, { 
+            style={[styles.pickerButton, { 
               borderColor: Colors[colorScheme].border,
-              backgroundColor: Colors[colorScheme].cardBackground 
+              backgroundColor: Colors[colorScheme].cardBackground,
+              marginTop: 12 
             }]}
             onPress={() => setShowDistrictPicker(!showDistrictPicker)}>
-            <ThemedText style={districtIds.length > 0 ? styles.pickerSelected : styles.pickerPlaceholder}>
-              {districtIds.length > 0 
-                ? `${districtIds.length} ilçe seçildi` 
-                : 'İlçe seçin (çoklu)'}
+            <ThemedText style={styles.pickerButtonText}>
+              {selectedDistricts.length > 0 
+                ? `${selectedDistricts.length} İlçe Seçildi` 
+                : 'İlçe Seç (Opsiyonel)'}
             </ThemedText>
-            <ThemedText>{showDistrictPicker ? '▲' : '▼'}</ThemedText>
+            <ThemedText style={styles.pickerButtonIcon}>
+              {showDistrictPicker ? '▲' : '▼'}
+            </ThemedText>
           </Pressable>
 
           {showDistrictPicker && (
-            <ScrollView 
-              style={[styles.dropdown, { 
-                borderColor: Colors[colorScheme].border,
-                backgroundColor: Colors[colorScheme].cardBackground 
-              }]}
-              nestedScrollEnabled>
+            <ScrollView style={[styles.pickerDropdown, { 
+              borderColor: Colors[colorScheme].border,
+              backgroundColor: Colors[colorScheme].cardBackground,
+              maxHeight: 200 
+            }]}>
               {selectedCity.districts.map((district) => {
                 const isSelected = districtIds.includes(district.id);
                 return (
                   <Pressable
                     key={district.id}
-                    style={[
-                      styles.dropdownItem,
-                      isSelected && styles.dropdownItemActive,
-                      { borderBottomColor: Colors[colorScheme].border }
-                    ]}
+                    style={[styles.pickerItem, isSelected && { backgroundColor: Colors[colorScheme].primary + '20' }]}
                     onPress={() => {
                       if (isSelected) {
                         setDistrictIds(districtIds.filter(id => id !== district.id));
@@ -200,8 +206,9 @@ export default function CreateRouteScreen() {
                         setDistrictIds([...districtIds, district.id]);
                       }
                     }}>
-                    <ThemedText>{district.name}</ThemedText>
-                    {isSelected && <ThemedText>✓</ThemedText>}
+                    <ThemedText style={styles.pickerItemText}>
+                      {isSelected ? '✓ ' : ''}{district.name}
+                    </ThemedText>
                   </Pressable>
                 );
               })}
@@ -209,92 +216,43 @@ export default function CreateRouteScreen() {
           )}
 
           {selectedDistricts.length > 0 && (
-            <View style={styles.selectedTags}>
+            <View style={styles.tagRow}>
               {selectedDistricts.map((district) => (
                 <View key={district.id} style={[styles.tag, { backgroundColor: Colors[colorScheme].badgeOrange }]}>
                   <ThemedText style={styles.tagText}>{district.name}</ThemedText>
                   <Pressable onPress={() => setDistrictIds(districtIds.filter(id => id !== district.id))}>
-                    <ThemedText style={styles.tagClose}> ✕</ThemedText>
+                    <ThemedText style={styles.tagRemove}> ✕</ThemedText>
                   </Pressable>
                 </View>
               ))}
             </View>
           )}
-        </View>
+        </>
       )}
 
-      {/* Açıklama */}
-      <View style={styles.field}>
-        <ThemedText style={styles.label}>Açıklama *</ThemedText>
-        <TextInput
-          style={[styles.textarea, { 
-            borderColor: Colors[colorScheme].border,
-            backgroundColor: Colors[colorScheme].cardBackground,
-            color: Colors[colorScheme].text 
+      <View style={styles.stepActions}>
+        <Pressable
+          style={[styles.button, { 
+            backgroundColor: Colors[colorScheme].primary,
+            opacity: !cityId ? 0.5 : 1 
           }]}
-          placeholder="Rotanızı kısaca tanıtın..."
-          placeholderTextColor={Colors[colorScheme].textLight}
-          value={description}
-          onChangeText={setDescription}
-          multiline
-          numberOfLines={4}
-        />
+          onPress={() => {
+            if (!cityId) {
+              Alert.alert('Şehir Seç', 'Lütfen bir şehir seçin.');
+              return;
+            }
+            setStep(2);
+          }}
+          disabled={!cityId}>
+          <ThemedText style={styles.buttonText} lightColor="#FFFFFF" darkColor="#1D1411">
+            İleri: Mekanları Ekle →
+          </ThemedText>
+        </Pressable>
       </View>
-
-      {/* Süre */}
-      <View style={styles.field}>
-        <ThemedText style={styles.label}>⏱️ Tahmini Süre (dk)</ThemedText>
-        <TextInput
-          style={[styles.input, { 
-            borderColor: Colors[colorScheme].border,
-            backgroundColor: Colors[colorScheme].cardBackground,
-            color: Colors[colorScheme].text 
-          }]}
-          placeholder="120"
-          placeholderTextColor={Colors[colorScheme].textLight}
-          value={durationMinutes}
-          onChangeText={setDurationMinutes}
-          keyboardType="numeric"
-        />
-      </View>
-
-      {/* Etiketler */}
-      <View style={styles.field}>
-        <ThemedText style={styles.label}>🏷️ Etiketler (virgülle ayırın)</ThemedText>
-        <TextInput
-          style={[styles.input, { 
-            borderColor: Colors[colorScheme].border,
-            backgroundColor: Colors[colorScheme].cardBackground,
-            color: Colors[colorScheme].text 
-          }]}
-          placeholder="Örn: kahve, tatlı, romantik"
-          placeholderTextColor={Colors[colorScheme].textLight}
-          value={tags}
-          onChangeText={setTags}
-        />
-      </View>
-
-      <Pressable
-        style={[styles.button, { 
-          backgroundColor: Colors[colorScheme].primary,
-          opacity: (!title || !cityId || !description) ? 0.5 : 1 
-        }]}
-        onPress={() => {
-          if (!title || !cityId || !description) {
-            Alert.alert('Eksik Bilgi', 'Lütfen zorunlu (*) alanları doldurun.');
-            return;
-          }
-          setStep(2);
-        }}
-        disabled={!title || !cityId || !description}>
-        <ThemedText style={styles.buttonText} lightColor="#FFFFFF" darkColor="#1D1411">
-          İleri: Duraklar Ekle →
-        </ThemedText>
-      </Pressable>
     </ScrollView>
   );
 
-  // ========== STEP 2: DURAKLAR ==========
+  // ========== STEP 2: MEKANLAR (RATING + GÖRSEL) ==========
   const handleSearchPlaces = async (query: string) => {
     setPlaceSearch(query);
     
@@ -317,9 +275,27 @@ export default function CreateRouteScreen() {
 
   const handleSelectPlace = (place: any) => {
     setCurrentPlaceName(place.name || '');
-    setCurrentNotes(place.address || '');
     setPlaceSearch('');
     setPlaceResults([]);
+  };
+
+  const handlePickStopImage = async () => {
+    try {
+      setLoading(true);
+      const result = await imageUploadService.uploadRouteCoverImage(user.id);
+      
+      if (result.success && result.url) {
+        setCurrentStopImage(result.url);
+        Alert.alert('Başarılı', 'Mekan görseli yüklendi!');
+      } else {
+        Alert.alert('Hata', result.error || 'Görsel yüklenemedi.');
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      Alert.alert('Hata', 'Görsel yüklenirken bir sorun oluştu.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleAddStop = () => {
@@ -333,12 +309,17 @@ export default function CreateRouteScreen() {
       placeName: currentPlaceName.trim(),
       notes: currentNotes.trim(),
       duration: parseInt(currentDuration) || 30,
+      image: currentStopImage,
+      rating: { ...currentRating },
     };
 
     setStops([...stops, newStop]);
     setCurrentPlaceName('');
     setCurrentNotes('');
     setCurrentDuration('30');
+    setCurrentStopImage('');
+    setCurrentRating({ cleanliness: 5, price: 5, quality: 5, speed: 5 });
+    Alert.alert('Eklendi!', 'Mekan listeye eklendi. Devam edebilirsiniz.');
   };
 
   const handleRemoveStop = (index: number) => {
@@ -346,56 +327,60 @@ export default function CreateRouteScreen() {
     setStops(updated);
   };
 
+  const renderRatingStars = (ratingKey: keyof StopRating, label: string) => {
+    const value = currentRating[ratingKey];
+    return (
+      <View style={styles.ratingRow}>
+        <ThemedText style={styles.ratingLabel}>{label}</ThemedText>
+        <View style={styles.stars}>
+          {[1, 2, 3, 4, 5].map((star) => (
+            <Pressable key={star} onPress={() => setCurrentRating({ ...currentRating, [ratingKey]: star })}>
+              <ThemedText style={styles.star}>{star <= value ? '⭐' : '☆'}</ThemedText>
+            </Pressable>
+          ))}
+        </View>
+      </View>
+    );
+  };
+
   const renderStep2 = () => (
     <ScrollView style={styles.stepContent}>
-      <ThemedText style={styles.stepTitle}>📍 Duraklar Ekle</ThemedText>
+      <ThemedText style={styles.stepTitle}>🍽️ Mekanları Ekle</ThemedText>
       
       {/* Google Maps Arama */}
       <View style={styles.field}>
-        <ThemedText style={styles.label}>🗺️ Google Maps'ten Ara</ThemedText>
+        <ThemedText style={styles.label}>🗺️ Mekan Ara</ThemedText>
         <TextInput
           style={[styles.input, { 
             borderColor: Colors[colorScheme].border,
             backgroundColor: Colors[colorScheme].cardBackground,
             color: Colors[colorScheme].text 
           }]}
-          placeholder="Mekan adı yazın..."
-          placeholderTextColor={Colors[colorScheme].textLight}
+          placeholder="Restoran, kafe, mekan adı..."
+          placeholderTextColor={Colors[colorScheme].textSecondary}
           value={placeSearch}
           onChangeText={handleSearchPlaces}
         />
-        
-        {searchingPlaces && (
-          <View style={styles.searchingIndicator}>
-            <ActivityIndicator size="small" color={Colors[colorScheme].primary} />
-            <ThemedText style={styles.searchingText}>Aranıyor...</ThemedText>
-          </View>
-        )}
-
+        {searchingPlaces && <ActivityIndicator size="small" color={Colors[colorScheme].primary} />}
         {placeResults.length > 0 && (
-          <ScrollView style={[styles.placeResults, { 
+          <ScrollView style={[styles.searchResults, { 
             borderColor: Colors[colorScheme].border,
             backgroundColor: Colors[colorScheme].cardBackground 
-          }]} nestedScrollEnabled>
+          }]}>
             {placeResults.map((place, idx) => (
               <Pressable
                 key={idx}
-                style={[styles.placeResultItem, { borderBottomColor: Colors[colorScheme].border }]}
+                style={styles.searchResultItem}
                 onPress={() => handleSelectPlace(place)}>
-                <ThemedText style={styles.placeName}>{place.name}</ThemedText>
-                <ThemedText style={styles.placeAddress} numberOfLines={1}>
-                  {place.address}
-                </ThemedText>
-                {place.rating && (
-                  <ThemedText style={styles.placeRating}>⭐ {place.rating}</ThemedText>
-                )}
+                <ThemedText style={styles.searchResultName}>{place.name}</ThemedText>
+                <ThemedText style={styles.searchResultAddress}>{place.address}</ThemedText>
               </Pressable>
             ))}
           </ScrollView>
         )}
       </View>
 
-      {/* Manuel Durak Ekleme */}
+      {/* Mekan Adı */}
       <View style={styles.field}>
         <ThemedText style={styles.label}>Mekan Adı *</ThemedText>
         <TextInput
@@ -404,23 +389,61 @@ export default function CreateRouteScreen() {
             backgroundColor: Colors[colorScheme].cardBackground,
             color: Colors[colorScheme].text 
           }]}
-          placeholder="Örn: Kahve Dünyası Kızılay"
-          placeholderTextColor={Colors[colorScheme].textLight}
+          placeholder="Örn: Hacı Abdullah"
+          placeholderTextColor={Colors[colorScheme].textSecondary}
           value={currentPlaceName}
           onChangeText={setCurrentPlaceName}
         />
       </View>
 
+      {/* Mekan Görseli */}
       <View style={styles.field}>
-        <ThemedText style={styles.label}>Notlar (Opsiyonel)</ThemedText>
+        <ThemedText style={styles.label}>📸 Mekan Görseli</ThemedText>
+        {currentStopImage ? (
+          <View>
+            <Image source={{ uri: currentStopImage }} style={styles.stopImagePreview} contentFit="cover" />
+            <Pressable
+              style={[styles.buttonSecondary, { 
+                borderColor: Colors[colorScheme].border,
+                backgroundColor: Colors[colorScheme].cardBackground,
+                marginTop: 8 
+              }]}
+              onPress={handlePickStopImage}>
+              <ThemedText style={styles.buttonSecondaryText}>🔄 Değiştir</ThemedText>
+            </Pressable>
+          </View>
+        ) : (
+          <Pressable
+            style={[styles.uploadButton, { 
+              borderColor: Colors[colorScheme].border,
+              backgroundColor: Colors[colorScheme].cardBackground 
+            }]}
+            onPress={handlePickStopImage}>
+            <ThemedText style={styles.uploadButtonText}>📷 Görsel Ekle</ThemedText>
+          </Pressable>
+        )}
+      </View>
+
+      {/* Rating Sistemi */}
+      <View style={styles.field}>
+        <ThemedText style={styles.label}>⭐ Değerlendirme</ThemedText>
+        {renderRatingStars('cleanliness', '🧼 Temizlik')}
+        {renderRatingStars('price', '💰 Fiyat/Performans')}
+        {renderRatingStars('quality', '🏆 Kalite')}
+        {renderRatingStars('speed', '⚡ Hız/Servis')}
+      </View>
+
+      {/* Notlar */}
+      <View style={styles.field}>
+        <ThemedText style={styles.label}>📝 Notlar (Opsiyonel)</ThemedText>
         <TextInput
           style={[styles.textarea, { 
             borderColor: Colors[colorScheme].border,
             backgroundColor: Colors[colorScheme].cardBackground,
             color: Colors[colorScheme].text 
           }]}
-          placeholder="Örn: Filtre kahve denenmeli, kek harika!"
-          placeholderTextColor={Colors[colorScheme].textLight}
+          placeholder="Bu mekanda ne denediniz? Tavsiyeniz nedir?"
+          placeholderTextColor={Colors[colorScheme].textSecondary}
           value={currentNotes}
           onChangeText={setCurrentNotes}
           multiline
@@ -428,8 +451,9 @@ export default function CreateRouteScreen() {
         />
       </View>
 
+      {/* Süre */}
       <View style={styles.field}>
-        <ThemedText style={styles.label}>⏱️ Süre (dk)</ThemedText>
+        <ThemedText style={styles.label}>⏱️ Ortalama Süre (dk)</ThemedText>
         <TextInput
           style={[styles.input, { 
             borderColor: Colors[colorScheme].border,
@@ -437,49 +461,56 @@ export default function CreateRouteScreen() {
             color: Colors[colorScheme].text 
           }]}
           placeholder="30"
-          placeholderTextColor={Colors[colorScheme].textLight}
+          placeholderTextColor={Colors[colorScheme].textSecondary}
           value={currentDuration}
           onChangeText={setCurrentDuration}
-          keyboardType="numeric"
+          keyboardType="number-pad"
         />
       </View>
 
+      {/* Ekle Butonu */}
       <Pressable
-        style={[styles.buttonSecondary, { 
-          borderColor: Colors[colorScheme].primary,
-          backgroundColor: Colors[colorScheme].cardBackground 
-        }]}
+        style={[styles.button, { backgroundColor: Colors[colorScheme].primary, marginBottom: 20 }]}
         onPress={handleAddStop}>
-        <ThemedText style={[styles.buttonSecondaryText, { color: Colors[colorScheme].primary }]}>
-          ➕ Durak Ekle
+        <ThemedText style={styles.buttonText} lightColor="#FFFFFF" darkColor="#1D1411">
+          ➕ Mekanı Ekle
         </ThemedText>
       </Pressable>
 
-      {/* Eklenen Duraklar */}
+      {/* Eklenen Mekanlar Listesi */}
       {stops.length > 0 && (
-        <View style={styles.stopsList}>
-          <ThemedText style={styles.subsectionTitle}>Eklenen Duraklar ({stops.length})</ThemedText>
-          {stops.map((stop, idx) => (
-            <View key={idx} style={[styles.stopCard, { 
-              backgroundColor: Colors[colorScheme].cardBackground,
-              borderColor: Colors[colorScheme].border 
+        <View style={styles.stopsListContainer}>
+          <ThemedText style={styles.stopsListTitle}>✅ Eklenen Mekanlar ({stops.length})</ThemedText>
+          {stops.map((stop, index) => (
+            <View key={index} style={[styles.stopCard, { 
+              borderColor: Colors[colorScheme].border,
+              backgroundColor: Colors[colorScheme].cardBackground 
             }]}>
-              <View style={styles.stopHeader}>
-                <ThemedText style={styles.stopOrder}>{stop.order}.</ThemedText>
-                <ThemedText style={styles.stopName}>{stop.placeName}</ThemedText>
-                <Pressable onPress={() => handleRemoveStop(idx)}>
-                  <ThemedText style={styles.removeButton}>🗑️</ThemedText>
-                </Pressable>
-              </View>
-              {stop.notes && (
-                <ThemedText style={styles.stopNotes}>{stop.notes}</ThemedText>
+              {stop.image && (
+                <Image source={{ uri: stop.image }} style={styles.stopCardImage} contentFit="cover" />
               )}
-              <ThemedText style={styles.stopDuration}>⏱️ {stop.duration} dk</ThemedText>
+              <View style={styles.stopCardContent}>
+                <ThemedText style={styles.stopCardTitle}>
+                  {index + 1}. {stop.placeName}
+                </ThemedText>
+                {stop.rating && (
+                  <ThemedText style={styles.stopCardRating}>
+                    ⭐ {((stop.rating.cleanliness + stop.rating.price + stop.rating.quality + stop.rating.speed) / 4).toFixed(1)}
+                  </ThemedText>
+                )}
+                {stop.notes && (
+                  <ThemedText style={styles.stopCardNotes} numberOfLines={2}>{stop.notes}</ThemedText>
+                )}
+              </View>
+              <Pressable onPress={() => handleRemoveStop(index)}>
+                <ThemedText style={styles.stopCardRemove}>🗑️</ThemedText>
+              </Pressable>
             </View>
           ))}
         </View>
       )}
 
+      {/* Navigation Butonları */}
       <View style={styles.stepActions}>
         <Pressable
           style={[styles.buttonSecondary, { 
@@ -499,21 +530,21 @@ export default function CreateRouteScreen() {
           }]}
           onPress={() => {
             if (stops.length === 0) {
-              Alert.alert('Durak Gerekli', 'En az 1 durak eklemelisiniz.');
+              Alert.alert('Mekan Gerekli', 'En az 1 mekan eklemelisiniz.');
               return;
             }
             setStep(3);
           }}
           disabled={stops.length === 0}>
           <ThemedText style={styles.buttonText} lightColor="#FFFFFF" darkColor="#1D1411">
-            İleri: Görseller →
+            İleri: Tamamla →
           </ThemedText>
         </Pressable>
       </View>
     </ScrollView>
   );
 
-  // ========== STEP 3: GÖRSELLER ==========
+  // ========== STEP 3: FİNAL (KAPAK + OPSİYONEL) ==========
   const handlePickCoverImage = async () => {
     try {
       setLoading(true);
@@ -533,86 +564,26 @@ export default function CreateRouteScreen() {
     }
   };
 
-  const renderStep3 = () => (
-    <ScrollView style={styles.stepContent}>
-      <ThemedText style={styles.stepTitle}>🖼️ Görseller</ThemedText>
-
-      {/* Kapak Görseli */}
-      <View style={styles.field}>
-        <ThemedText style={styles.label}>Kapak Görseli *</ThemedText>
-        {coverImage ? (
-          <View>
-            <Image source={{ uri: coverImage }} style={styles.coverImagePreview} contentFit="cover" />
-            <Pressable
-              style={[styles.buttonSecondary, { 
-                borderColor: Colors[colorScheme].border,
-                backgroundColor: Colors[colorScheme].cardBackground,
-                marginTop: 12 
-              }]}
-              onPress={handlePickCoverImage}>
-              <ThemedText style={styles.buttonSecondaryText}>🔄 Değiştir</ThemedText>
-            </Pressable>
-          </View>
-        ) : (
-          <Pressable
-            style={[styles.uploadButton, { 
-              borderColor: Colors[colorScheme].border,
-              backgroundColor: Colors[colorScheme].cardBackground 
-            }]}
-            onPress={handlePickCoverImage}>
-            <ThemedText style={styles.uploadButtonText}>📷 Kapak Görseli Ekle</ThemedText>
-          </Pressable>
-        )}
-      </View>
-
-      <View style={styles.stepActions}>
-        <Pressable
-          style={[styles.buttonSecondary, { 
-            borderColor: Colors[colorScheme].border,
-            backgroundColor: Colors[colorScheme].cardBackground,
-            flex: 1 
-          }]}
-          onPress={() => setStep(2)}>
-          <ThemedText style={styles.buttonSecondaryText}>← Geri</ThemedText>
-        </Pressable>
-        
-        <Pressable
-          style={[styles.button, { 
-            backgroundColor: Colors[colorScheme].primary,
-            flex: 2,
-            opacity: !coverImage ? 0.5 : 1 
-          }]}
-          onPress={() => {
-            if (!coverImage) {
-              Alert.alert('Kapak Görseli', 'Lütfen bir kapak görseli ekleyin.');
-              return;
-            }
-            setStep(4);
-          }}
-          disabled={!coverImage}>
-          <ThemedText style={styles.buttonText} lightColor="#FFFFFF" darkColor="#1D1411">
-            İleri: Önizleme →
-          </ThemedText>
-        </Pressable>
-      </View>
-    </ScrollView>
-  );
-
-  // ========== STEP 4: ÖNİZLEME & YAYINLA ==========
   const handleSubmit = async () => {
     try {
       setLoading(true);
 
+      // Otomatik başlık oluştur (yoksa)
+      const autoTitle = title.trim() || `${selectedCity?.name} Lezzet Rotası`;
+
+      // Kapak görseli yoksa ilk mekanın görselini kullan
+      const finalCoverImage = coverImage || stops[0]?.image || 'https://picsum.photos/400/300';
+
       const routeInput = {
         cityId,
         districtIds,
-        title,
-        description,
-        coverImage,
-        images: additionalImages,
-        durationMinutes: parseInt(durationMinutes) || 120,
+        title: autoTitle,
+        description: description.trim() || `${stops.length} mekan içeren ${selectedCity?.name} lezzet rotası`,
+        coverImage: finalCoverImage,
+        images: stops.filter(s => s.image).map(s => s.image!),
+        durationMinutes: stops.reduce((sum, s) => sum + s.duration, 0),
         distanceKm: 5,
-        tags: tags.split(',').map(t => t.trim()).filter(Boolean),
+        tags: ['lezzet', selectedCity?.name.toLowerCase() || ''].filter(Boolean),
         difficulty: 'easy' as const,
         budgetRange: 'moderate' as const,
         stops: stops.map((stop) => ({
@@ -640,7 +611,16 @@ export default function CreateRouteScreen() {
         Alert.alert(
           'Başarılı! 🎉',
           'Rotanız oluşturuldu ve yayına girdi.',
-          [{ text: 'Tamam', onPress: () => router.push('/(tabs)/explore') }]
+          [
+            { 
+              text: 'Yeni Rota Oluştur', 
+              onPress: () => resetForm() 
+            },
+            { 
+              text: 'Rotaları Gör', 
+              onPress: () => router.push('/(tabs)/explore') 
+            }
+          ]
         );
       } else {
         console.error('❌ ROTA OLUŞTURULAMADI:', response.error);
@@ -655,41 +635,96 @@ export default function CreateRouteScreen() {
     }
   };
 
-  const renderStep4 = () => (
+  const renderStep3 = () => (
     <ScrollView style={styles.stepContent}>
-      <ThemedText style={styles.stepTitle}>✅ Önizleme</ThemedText>
+      <ThemedText style={styles.stepTitle}>✨ Son Dokunuşlar</ThemedText>
 
-      <View style={[styles.previewCard, { 
-        backgroundColor: Colors[colorScheme].cardBackground,
-        borderColor: Colors[colorScheme].border 
-      }]}>
-        <Image source={{ uri: coverImage }} style={styles.previewImage} contentFit="cover" />
-        
-        <View style={styles.previewContent}>
-          <ThemedText style={styles.previewTitle}>{title}</ThemedText>
-          <ThemedText style={styles.previewCity}>
-            📍 {selectedCity?.name}
-            {selectedDistricts.length > 0 && ` - ${selectedDistricts.map(d => d.name).join(', ')}`}
-          </ThemedText>
-          <ThemedText style={styles.previewDescription}>{description}</ThemedText>
-          
-          <View style={styles.previewMeta}>
-            <ThemedText style={styles.metaItem}>⏱️ {durationMinutes} dk</ThemedText>
-            <ThemedText style={styles.metaItem}>📍 {stops.length} durak</ThemedText>
-          </View>
-
-          {tags && (
-            <View style={styles.tagRow}>
-              {tags.split(',').map((tag, idx) => (
-                <View key={idx} style={[styles.tag, { backgroundColor: Colors[colorScheme].badgeOrange }]}>
-                  <ThemedText style={styles.tagText}>{tag.trim()}</ThemedText>
-                </View>
-              ))}
-            </View>
-          )}
-        </View>
+      {/* Başlık (Opsiyonel) */}
+      <View style={styles.field}>
+        <ThemedText style={styles.label}>📝 Rota Başlığı (Opsiyonel)</ThemedText>
+        <TextInput
+          style={[styles.input, { 
+            borderColor: Colors[colorScheme].border,
+            backgroundColor: Colors[colorScheme].cardBackground,
+            color: Colors[colorScheme].text 
+          }]}
+          placeholder={`${selectedCity?.name} Lezzet Rotası (otomatik)`}
+          placeholderTextColor={Colors[colorScheme].textSecondary}
+          value={title}
+          onChangeText={setTitle}
+        />
       </View>
 
+      {/* Açıklama (Opsiyonel) */}
+      <View style={styles.field}>
+        <ThemedText style={styles.label}>📄 Açıklama (Opsiyonel)</ThemedText>
+        <TextInput
+          style={[styles.textarea, { 
+            borderColor: Colors[colorScheme].border,
+            backgroundColor: Colors[colorScheme].cardBackground,
+            color: Colors[colorScheme].text 
+          }]}
+          placeholder="Bu rota hakkında kısa bir açıklama..."
+          placeholderTextColor={Colors[colorScheme].textSecondary}
+          value={description}
+          onChangeText={setDescription}
+          multiline
+          numberOfLines={3}
+        />
+      </View>
+
+      {/* Kapak Görseli (Opsiyonel) */}
+      <View style={styles.field}>
+        <ThemedText style={styles.label}>🖼️ Kapak Görseli (Opsiyonel)</ThemedText>
+        <ThemedText style={styles.helperText}>
+          {stops[0]?.image ? 'Boş bırakırsanız ilk mekanın görseli kullanılır' : 'İlk mekanınıza görsel ekleyin veya buradan yükleyin'}
+        </ThemedText>
+        {coverImage ? (
+          <View>
+            <Image source={{ uri: coverImage }} style={styles.coverImagePreview} contentFit="cover" />
+            <Pressable
+              style={[styles.buttonSecondary, { 
+                borderColor: Colors[colorScheme].border,
+                backgroundColor: Colors[colorScheme].cardBackground,
+                marginTop: 12 
+              }]}
+              onPress={handlePickCoverImage}>
+              <ThemedText style={styles.buttonSecondaryText}>🔄 Değiştir</ThemedText>
+            </Pressable>
+          </View>
+        ) : (
+          <Pressable
+            style={[styles.uploadButton, { 
+              borderColor: Colors[colorScheme].border,
+              backgroundColor: Colors[colorScheme].cardBackground 
+            }]}
+            onPress={handlePickCoverImage}>
+            <ThemedText style={styles.uploadButtonText}>📷 Kapak Görseli Ekle</ThemedText>
+          </Pressable>
+        )}
+      </View>
+
+      {/* Özet */}
+      <View style={[styles.summaryCard, { 
+        backgroundColor: Colors[colorScheme].cardBackground,
+        borderColor: Colors[colorScheme].primary 
+      }]}>
+        <ThemedText style={styles.summaryTitle}>📊 Rota Özeti</ThemedText>
+        <ThemedText style={styles.summaryText}>📍 Şehir: {selectedCity?.name}</ThemedText>
+        {selectedDistricts.length > 0 && (
+          <ThemedText style={styles.summaryText}>🏘️ İlçeler: {selectedDistricts.map(d => d.name).join(', ')}</ThemedText>
+        )}
+        <ThemedText style={styles.summaryText}>🍽️ Mekan Sayısı: {stops.length}</ThemedText>
+        <ThemedText style={styles.summaryText}>⏱️ Toplam Süre: {stops.reduce((sum, s) => sum + s.duration, 0)} dk</ThemedText>
+        <ThemedText style={styles.summaryText}>⭐ Ortalama Puan: {stops.length > 0 ? (
+          stops.reduce((sum, s) => {
+            if (!s.rating) return sum;
+            return sum + (s.rating.cleanliness + s.rating.price + s.rating.quality + s.rating.speed) / 4;
+          }, 0) / stops.length
+        ).toFixed(1) : '0'}/5</ThemedText>
+      </View>
+
+      {/* Navigation Butonları */}
       <View style={styles.stepActions}>
         <Pressable
           style={[styles.buttonSecondary, { 
@@ -697,7 +732,7 @@ export default function CreateRouteScreen() {
             backgroundColor: Colors[colorScheme].cardBackground,
             flex: 1 
           }]}
-          onPress={() => setStep(3)}>
+          onPress={() => setStep(2)}>
           <ThemedText style={styles.buttonSecondaryText}>← Geri</ThemedText>
         </Pressable>
         
@@ -722,32 +757,30 @@ export default function CreateRouteScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      {/* Header */}
       <LinearGradient
         colors={[Colors[colorScheme].primary, Colors[colorScheme].secondary]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
         style={styles.header}>
-        <ThemedText type="subtitle" style={styles.headerTitle} lightColor="#FFFFFF" darkColor="#FFFFFF">
+        <ThemedText style={styles.headerTitle} lightColor="#FFFFFF" darkColor="#FFFFFF">
           Yeni Rota Oluştur
         </ThemedText>
-        <View style={styles.progressBar}>
-          {[1, 2, 3, 4].map((s) => (
+        <View style={styles.stepIndicator}>
+          {[1, 2, 3].map((s) => (
             <View
               key={s}
               style={[
-                styles.progressDot,
-                s <= step && { backgroundColor: '#FFFFFF' },
-                s > step && { backgroundColor: 'rgba(255, 255, 255, 0.3)' },
+                styles.stepDot,
+                { backgroundColor: step >= s ? '#FFFFFF' : 'rgba(255,255,255,0.3)' },
               ]}
             />
           ))}
         </View>
       </LinearGradient>
 
-      {/* Content */}
       {step === 1 && renderStep1()}
       {step === 2 && renderStep2()}
       {step === 3 && renderStep3()}
-      {step === 4 && renderStep4()}
     </ThemedView>
   );
 }
@@ -760,29 +793,29 @@ const styles = StyleSheet.create({
     paddingTop: 60,
     paddingBottom: 20,
     paddingHorizontal: 20,
-    gap: 12,
   },
   headerTitle: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: 'bold',
+    marginBottom: 12,
   },
-  progressBar: {
+  stepIndicator: {
     flexDirection: 'row',
     gap: 8,
   },
-  progressDot: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
+  stepDot: {
+    width: 30,
+    height: 6,
+    borderRadius: 3,
   },
   stepContent: {
     flex: 1,
     padding: 20,
   },
   stepTitle: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: 'bold',
-    marginBottom: 24,
+    marginBottom: 20,
   },
   field: {
     marginBottom: 20,
@@ -792,53 +825,54 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: 8,
   },
+  helperText: {
+    fontSize: 13,
+    opacity: 0.6,
+    marginBottom: 8,
+  },
   input: {
-    padding: 14,
-    borderRadius: 12,
     borderWidth: 1,
+    borderRadius: 12,
+    padding: 14,
     fontSize: 16,
   },
   textarea: {
-    padding: 14,
-    borderRadius: 12,
     borderWidth: 1,
+    borderRadius: 12,
+    padding: 14,
     fontSize: 16,
     minHeight: 100,
     textAlignVertical: 'top',
   },
-  picker: {
+  pickerButton: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderRadius: 12,
     padding: 14,
-    borderRadius: 12,
+  },
+  pickerButtonText: {
+    fontSize: 16,
+  },
+  pickerButtonIcon: {
+    fontSize: 16,
+  },
+  pickerDropdown: {
     borderWidth: 1,
-  },
-  pickerSelected: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  pickerPlaceholder: {
-    fontSize: 16,
-    opacity: 0.5,
-  },
-  dropdown: {
+    borderRadius: 12,
     marginTop: 8,
-    borderRadius: 12,
-    borderWidth: 1,
-    maxHeight: 250,
+    maxHeight: 300,
   },
-  dropdownItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  pickerItem: {
     padding: 14,
     borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.05)',
   },
-  dropdownItemActive: {
-    backgroundColor: 'rgba(255, 107, 53, 0.1)',
+  pickerItemText: {
+    fontSize: 15,
   },
-  selectedTags: {
+  tagRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
@@ -849,179 +883,160 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 8,
+    borderRadius: 16,
   },
   tagText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
-    color: '#FFFFFF',
   },
-  tagClose: {
+  tagRemove: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: '#FFFFFF',
     marginLeft: 4,
   },
-  searchingIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 8,
-  },
-  searchingText: {
-    fontSize: 14,
-    opacity: 0.6,
-  },
-  placeResults: {
-    marginTop: 8,
-    borderRadius: 12,
+  searchResults: {
     borderWidth: 1,
+    borderRadius: 12,
+    marginTop: 8,
     maxHeight: 200,
   },
-  placeResultItem: {
+  searchResultItem: {
     padding: 12,
     borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.05)',
   },
-  placeName: {
+  searchResultName: {
     fontSize: 15,
     fontWeight: '600',
-    marginBottom: 4,
   },
-  placeAddress: {
+  searchResultAddress: {
     fontSize: 13,
     opacity: 0.6,
-    marginBottom: 4,
-  },
-  placeRating: {
-    fontSize: 13,
-    color: '#FF6B35',
-  },
-  stopsList: {
-    marginTop: 24,
-    gap: 12,
-  },
-  subsectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    marginBottom: 8,
-  },
-  stopCard: {
-    padding: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    gap: 8,
-  },
-  stopHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  stopOrder: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#FF6B35',
-  },
-  stopName: {
-    flex: 1,
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  removeButton: {
-    fontSize: 18,
-  },
-  stopNotes: {
-    fontSize: 14,
-    opacity: 0.7,
-    marginLeft: 28,
-  },
-  stopDuration: {
-    fontSize: 13,
-    opacity: 0.6,
-    marginLeft: 28,
+    marginTop: 2,
   },
   uploadButton: {
-    padding: 40,
-    borderRadius: 12,
     borderWidth: 2,
     borderStyle: 'dashed',
+    borderRadius: 12,
+    padding: 20,
     alignItems: 'center',
-    justifyContent: 'center',
   },
   uploadButtonText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
+  },
+  stopImagePreview: {
+    width: '100%',
+    height: 200,
+    borderRadius: 12,
   },
   coverImagePreview: {
     width: '100%',
     height: 200,
     borderRadius: 12,
   },
-  previewCard: {
-    borderRadius: 16,
-    overflow: 'hidden',
-    borderWidth: 1,
-    marginBottom: 24,
-  },
-  previewImage: {
-    width: '100%',
-    height: 200,
-  },
-  previewContent: {
-    padding: 16,
-    gap: 12,
-  },
-  previewTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  previewCity: {
-    fontSize: 15,
-    opacity: 0.7,
-  },
-  previewDescription: {
-    fontSize: 15,
-    lineHeight: 22,
-  },
-  previewMeta: {
+  ratingRow: {
     flexDirection: 'row',
-    gap: 16,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
   },
-  metaItem: {
-    fontSize: 14,
+  ratingLabel: {
+    fontSize: 15,
+    fontWeight: '500',
+    flex: 1,
+  },
+  stars: {
+    flexDirection: 'row',
+    gap: 4,
+  },
+  star: {
+    fontSize: 24,
+  },
+  stopsListContainer: {
+    marginTop: 20,
+    marginBottom: 20,
+  },
+  stopsListTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 12,
+  },
+  stopCard: {
+    flexDirection: 'row',
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+    alignItems: 'center',
+  },
+  stopCardImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+    marginRight: 12,
+  },
+  stopCardContent: {
+    flex: 1,
+  },
+  stopCardTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  stopCardRating: {
+    fontSize: 13,
+    marginBottom: 2,
+  },
+  stopCardNotes: {
+    fontSize: 12,
     opacity: 0.6,
   },
-  tagRow: {
+  stopCardRemove: {
+    fontSize: 20,
+    padding: 8,
+  },
+  summaryCard: {
+    borderWidth: 2,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+  },
+  summaryTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 12,
+  },
+  summaryText: {
+    fontSize: 15,
+    marginBottom: 6,
+  },
+  stepActions: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
+    gap: 12,
+    marginTop: 20,
+    marginBottom: 40,
   },
   button: {
     padding: 16,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 40,
   },
   buttonText: {
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: 'bold',
   },
   buttonSecondary: {
+    borderWidth: 2,
     padding: 16,
     borderRadius: 12,
-    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
   buttonSecondaryText: {
     fontSize: 16,
     fontWeight: '600',
-  },
-  stepActions: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 24,
-    marginBottom: 40,
   },
   errorText: {
     fontSize: 16,
