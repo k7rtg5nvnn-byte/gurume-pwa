@@ -9,7 +9,12 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Yakındaki lezzet rotalarını gösterebilmek için konumuna ihtiyacımız var.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Yakındaki lezzet rotalarını gösterebilmek için konumuna ihtiyacımız var.",
+        "NSUserNotificationUsageDescription": "Yeni rota önerilerini ve yakındaki lezzetleri bildirim olarak göndermek için izne ihtiyacımız var."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -19,7 +24,12 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "POST_NOTIFICATIONS"
+      ]
     },
     "web": {
       "output": "static",
@@ -37,6 +47,20 @@
           "dark": {
             "backgroundColor": "#000000"
           }
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#FF6B2C",
+          "sounds": []
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Yakındaki lezzet rotalarını gösterebilmek için konumuna ihtiyacımız var."
         }
       ]
     ],

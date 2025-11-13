@@ -13,11 +13,12 @@ export default function RouteDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const colorScheme = useColorScheme() ?? 'light';
-  const { getRouteById, getCityById, getPlaceById } = useGurumeData();
+  const { getRouteById, getCityById, getPlaceById, favoriteRouteIds, toggleFavorite } = useGurumeData();
 
   const route = id ? getRouteById(id) : undefined;
 
   const city = useMemo(() => (route ? getCityById(route.cityId) : undefined), [route, getCityById]);
+  const isFavorite = route ? favoriteRouteIds.includes(route.id) : false;
 
   if (!route) {
     return (
@@ -37,17 +38,22 @@ export default function RouteDetailScreen() {
         <ThemedText style={styles.backLinkText}>← Rotalara dön</ThemedText>
       </Pressable>
 
-      <ThemedView style={styles.coverCard}>
-        <Image source={{ uri: route.coverImage }} style={styles.coverImage} />
-        <View style={styles.coverOverlay} />
-        <View style={styles.coverContent}>
-          <ThemedText type="title" style={styles.coverTitle}>
-            {route.title}
-          </ThemedText>
-          <ThemedText style={styles.coverMeta}>
-            {city?.name ?? 'Bilinmeyen şehir'} • {route.stops.length} durak • {route.durationMinutes} dk •
-            ⭐ {route.averageRating.toFixed(1)}
-          </ThemedText>
+        <ThemedView style={styles.coverCard}>
+          <Image source={{ uri: route.coverImage }} style={styles.coverImage} />
+          <View style={styles.coverOverlay} />
+          <View style={styles.coverContent}>
+            <ThemedText type="title" style={styles.coverTitle}>
+              {route.title}
+            </ThemedText>
+            <Pressable
+              onPress={() => toggleFavorite(route.id)}
+              style={styles.coverFavoriteButton}>
+              <ThemedText style={styles.coverFavoriteLabel}>{isFavorite ? '♥' : '♡'}</ThemedText>
+            </Pressable>
+            <ThemedText style={styles.coverMeta}>
+              {city?.name ?? 'Bilinmeyen şehir'} • {route.stops.length} durak •{' '}
+              {route.durationMinutes ?? '--'} dk • ⭐ {route.averageRating.toFixed(1)}
+            </ThemedText>
           <View style={styles.authorRow}>
             <View style={[styles.authorAvatar, { backgroundColor: Colors[colorScheme].tint }]}>
               <ThemedText style={styles.authorInitials} lightColor="#FFFFFF" darkColor="#1D1411">
@@ -70,10 +76,13 @@ export default function RouteDetailScreen() {
       <ThemedView style={styles.section}>
         <ThemedText type="subtitle">Rota Özeti</ThemedText>
         <ThemedText style={styles.sectionBody}>{route.description}</ThemedText>
-        <View style={styles.metaRow}>
-          <MetaTile label="Süre" value={`${route.durationMinutes} dk`} />
-          <MetaTile label="Mesafe" value={`${route.distanceKm.toFixed(1)} km`} />
-          <MetaTile label="Puan" value={`⭐ ${route.averageRating.toFixed(1)}`} />
+          <View style={styles.metaRow}>
+            <MetaTile label="Süre" value={route.durationMinutes ? `${route.durationMinutes} dk` : 'Belirsiz'} />
+            <MetaTile
+              label="Mesafe"
+              value={typeof route.distanceKm === 'number' ? `${route.distanceKm.toFixed(1)} km` : 'Belirsiz'}
+            />
+            <MetaTile label="Puan" value={`⭐ ${route.averageRating.toFixed(1)}`} />
         </View>
         <View style={styles.tagRow}>
           {route.tags.map((tag) => (
@@ -82,50 +91,60 @@ export default function RouteDetailScreen() {
         </View>
       </ThemedView>
 
-      <ThemedView style={styles.section}>
-        <ThemedText type="subtitle">Duraklar</ThemedText>
-        <View style={styles.stopList}>
-          {route.stops.map((stop) => {
-            const place = getPlaceById(stop.placeId);
+        <ThemedView style={styles.section}>
+          <ThemedText type="subtitle">Duraklar</ThemedText>
+          <View style={styles.stopList}>
+            {route.stops.map((stop) => {
+              const place = stop.placeId ? getPlaceById(stop.placeId) : undefined;
+              if (!place && !stop.placeName) {
+                return null;
+              }
 
-            if (!place) {
-              return null;
-            }
+              const displayName = place?.name ?? stop.placeName ?? 'Lezzet durağı';
+              const displaySummary = place?.summary ?? stop.placeSummary ?? '';
+              const tastingNotes = stop.tastingNotes.length ? stop.tastingNotes : place?.specialties ?? [];
+              const image = stop.imageUrl ?? place?.heroImage;
 
-            return (
-              <ThemedView key={stop.placeId} style={styles.stopCard}>
-                <Image source={{ uri: place.heroImage }} style={styles.stopImage} />
-                <View style={styles.stopBody}>
-                  <View style={styles.stopHeader}>
-                    <View style={styles.stopOrder}>
-                      <ThemedText style={styles.stopOrderText}>{stop.order}</ThemedText>
-                    </View>
-                    <View style={styles.stopTitleGroup}>
-                      <ThemedText type="subtitle" style={styles.stopTitle}>
-                        {place.name}
-                      </ThemedText>
-                      <ThemedText style={styles.stopDistrict}>{place.summary}</ThemedText>
-                    </View>
-                  </View>
-                  <ThemedText style={styles.stopHighlight}>{stop.highlight}</ThemedText>
-                  <View style={styles.tastingList}>
-                    {stop.tastingNotes.map((note) => (
-                      <View key={note} style={styles.tastingItem}>
-                        <ThemedText style={styles.tastingText}>{note}</ThemedText>
+              return (
+                <ThemedView key={stop.placeId ?? stop.id ?? `stop-${stop.order}`} style={styles.stopCard}>
+                  {image ? <Image source={{ uri: image }} style={styles.stopImage} /> : null}
+                  <View style={styles.stopBody}>
+                    <View style={styles.stopHeader}>
+                      <View style={styles.stopOrder}>
+                        <ThemedText style={styles.stopOrderText}>{stop.order}</ThemedText>
                       </View>
-                    ))}
+                      <View style={styles.stopTitleGroup}>
+                        <ThemedText type="subtitle" style={styles.stopTitle}>
+                          {displayName}
+                        </ThemedText>
+                        <ThemedText style={styles.stopDistrict}>{displaySummary}</ThemedText>
+                      </View>
+                    </View>
+                    <ThemedText style={styles.stopHighlight}>{stop.highlight}</ThemedText>
+                    <View style={styles.tastingList}>
+                      {tastingNotes.map((note) => (
+                        <View key={note} style={styles.tastingItem}>
+                          <ThemedText style={styles.tastingText}>{note}</ThemedText>
+                        </View>
+                      ))}
+                    </View>
+                    {place ? (
+                      <View style={styles.scoreRow}>
+                        <ScoreChip label="Hız" value={place.speedScore} />
+                        <ScoreChip label="Temizlik" value={place.cleanlinessScore} />
+                        <ScoreChip label="Fiyat" value={place.valueScore} />
+                      </View>
+                    ) : stop.priceLevel ? (
+                      <View style={styles.scoreRow}>
+                        <PriceChip priceLevel={stop.priceLevel} />
+                      </View>
+                    ) : null}
                   </View>
-                  <View style={styles.scoreRow}>
-                    <ScoreChip label="Hız" value={place.speedScore} />
-                    <ScoreChip label="Temizlik" value={place.cleanlinessScore} />
-                    <ScoreChip label="Fiyat" value={place.valueScore} />
-                  </View>
-                </View>
-              </ThemedView>
-            );
-          })}
-        </View>
-      </ThemedView>
+                </ThemedView>
+              );
+            })}
+          </View>
+        </ThemedView>
 
       <ThemedView style={styles.section}>
         <ThemedText type="subtitle">Planlama Notları</ThemedText>
@@ -169,6 +188,15 @@ function ScoreChip({ label, value }: { label: string; value: number }) {
     <View style={styles.scoreChip}>
       <ThemedText style={styles.scoreChipLabel}>{label}</ThemedText>
       <ThemedText style={styles.scoreChipValue}>{value.toFixed(1)}</ThemedText>
+    </View>
+  );
+}
+
+function PriceChip({ priceLevel }: { priceLevel: '₺' | '₺₺' | '₺₺₺' }) {
+  return (
+    <View style={styles.scoreChip}>
+      <ThemedText style={styles.scoreChipLabel}>Fiyat</ThemedText>
+      <ThemedText style={styles.scoreChipValue}>{priceLevel}</ThemedText>
     </View>
   );
 }
@@ -226,6 +254,21 @@ const styles = StyleSheet.create({
     right: 20,
     bottom: 20,
     gap: 12,
+  },
+  coverFavoriteButton: {
+    position: 'absolute',
+    top: -10,
+    right: -10,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255,255,255,0.92)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  coverFavoriteLabel: {
+    fontSize: 22,
+    color: '#F2A365',
   },
   coverTitle: {
     color: '#FFFFFF',

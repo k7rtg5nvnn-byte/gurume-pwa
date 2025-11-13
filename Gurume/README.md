@@ -1,50 +1,80 @@
-# Welcome to your Expo app 👋
+# Gurume – Türkiye Lezzet Rotası Uygulaması
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Expo Router kullanılarak geliştirilen Gurume, 81 il için kürasyonlu yemek-içmek rotaları sunar. Kullanıcılar:
 
-## Get started
+- Şehirlere göre önerileri keşfedebilir
+- Konumuna göre yakın rotalar için bildirim alır
+- Favori rotalar listesini yönetir
+- Kendi rotalarını oluşturup Supabase üzerinde saklar
 
-1. Install dependencies
+## Kurulum
+
+1. Bağımlılıkları yükleyin:
 
    ```bash
    npm install
    ```
 
-2. Start the app
+2. `.env` dosyası oluşturup Supabase bilgilerini girin (demo modunda boş bırakabilirsiniz):
+
+   ```ini
+   EXPO_PUBLIC_SUPABASE_URL=https://<proje-id>.supabase.co
+   EXPO_PUBLIC_SUPABASE_ANON_KEY=<anon-key>
+   ```
+
+3. Geliştirme sunucusunu başlatın:
 
    ```bash
    npx expo start
    ```
 
-In the output, you'll find options to open the app in a
+4. QR kodu Expo Go ile okutun veya emülatörde açın.
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+## Supabase Yapılandırması
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+Aşağıdaki tabloları oluşturun:
 
-## Get a fresh project
+- `profiles`
+- `routes`
+- `route_stops`
+- `favorites`
+- `places` (opsiyonel, moderasyonlu mekan eklemek için)
 
-When you're ready, run:
+`types/database.ts` dosyasında şema örneği yer alıyor. `profiles` tablosu `auth.users` ile 1-1 eşleşecek şekilde tasarlandı.
 
-```bash
-npm run reset-project
-```
+### RLS Önerisi
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+- `profiles`: kullanıcı kendi profiline erişebilir.
+- `routes`: `is_published = true` olan rotalar herkese görünür, kendi rotanı düzenleyebilirsin.
+- `route_stops`: `routes.user_id = auth.uid()` şartı.
+- `favorites`: kullanıcı sadece kendi kayıtlarını görebilir/düzenler.
 
-## Learn more
+## Özellikler
 
-To learn more about developing your project with Expo, look at the following resources:
+- **Konum tabanlı öneri:** Expo Location ile en yakın rotalar listelenir, Expo Notifications ile bildirim gönderilir.
+- **Favoriler:** Supabase üzerinde kullanıcıya özel saklanır.
+- **Rota oluşturma:** Şehir/ilçe seçimi, dinamik stop ekleme, Supabase’e kaydetme.
+- **Profil yönetimi:** Ad, telefon, bio, şehir/ilçe bilgilerini güncelleme.
+- **Demo modu:** Supabase yapılandırılmadığında veriler cihaz üzerinde saklanır, giriş olmadan gezilebilir.
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+## Önemli Komutlar
 
-## Join the community
+- `npm run lint`: Kod kalitesini kontrol eder.
+- `npx expo start --tunnel`: QR kodu paylaşmak için tünel açar.
 
-Join our community of developers creating universal apps.
+## Bildirim ve Konum İzinleri
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+`app.json` içinde iOS ve Android izin açıklamaları tanımlanmıştır. Android için `ACCESS_FINE_LOCATION`, `ACCESS_COARSE_LOCATION`, `POST_NOTIFICATIONS` izinleri otomatik olarak istenir.
+
+## Tasarım Notları
+
+- Renk paleti sarı/turuncu/kırmızı tonlarında
+- Bileşenler `components/themed-*` yapısı ile tema dostu
+- Tüm 81 ilin verileri `turkiyeapi.dev` üzerinden dinamik olarak yüklenir; Supabase yoksa dahi şehir listeleri güncellenir.
+
+## Geliştirme Yol Haritası
+
+- Rotalar için kullanıcı yorum/puanlama
+- Supabase Edge Functions ile moderasyon akışı
+- Harita görünümü ve navigasyon entegrasyonu
+- Topluluk modülü (rota paylaşımı, yorumlar)
